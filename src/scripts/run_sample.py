@@ -2,7 +2,7 @@ import time
 import numpy as np
 import os
 import argparse
-from typing import Tuple, Optional, Any
+from typing import Tuple, Optional
 from src.utils.data_io import load_cities
 from src.core.preprocessing import build_candidate_sets, refine_candidate_set_with_alpha
 from src.core.seed_generation import generate_hilbert_seeds
@@ -32,6 +32,8 @@ def save_cached_hk(n_sample: int, hk: float, pi: np.ndarray) -> None:
 def warmup() -> None:
     print("Warming up JIT...")
     coords = np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0.5, 0.5]], dtype=np.float64)
+    coords_x = coords[:, 0]
+    coords_y = coords[:, 1]
     cs = np.array(
         [[1, 3, 4], [0, 2, 4], [1, 3, 4], [0, 2, 4], [0, 1, 2]], dtype=np.int32
     )
@@ -40,7 +42,8 @@ def warmup() -> None:
     locked = np.full((5, 2), -1, dtype=np.int32)
     cascading_kopt_optimize(
         np.array([0, 1, 2, 3, 4], dtype=np.int32),
-        coords,
+        coords_x,
+        coords_y,
         cs,
         locked,
         num_kicks=2,
@@ -72,7 +75,7 @@ def run_benchmark(
     # 2. Preprocessing
     print("Step 2: Building initial candidate sets (Delaunay+KDTree)...")
     start_pre = time.time()
-    candidate_set = build_candidate_sets(coords, k=32)
+    candidate_set = build_candidate_sets(coords, k=64)
     print(f"Initial preprocessing done in {time.time() - start_pre:.2f}s.")
 
     print(

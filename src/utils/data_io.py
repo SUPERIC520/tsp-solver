@@ -14,6 +14,20 @@ def load_cities(filepath: str) -> np.ndarray:
     return data
 
 
+def save_solution_csv(filepath: str, tour: np.ndarray, length: float) -> None:
+    """
+    Save the optimized tour and its length to a CSV file.
+    Format:
+    length,L
+    index,I1,I2,...,IN
+    """
+    with open(filepath, "w") as f:
+        f.write(f"length,{length}\n")
+        # Joining indices with commas for CSV format
+        indices_str = ",".join(map(str, tour))
+        f.write(f"indices,{indices_str}\n")
+
+
 def save_tour(filepath: str, tour: np.ndarray, length: float) -> None:
     """
     Save the optimized tour and its length to a file.

@@ -5,7 +5,7 @@ from src.core.preprocessing import build_candidate_sets
 lkh_optimize_tour = cascading_kopt_optimize_tour
 
 
-def test_lkh_optimize_circle():
+def test_lkh_optimize_circle() -> None:
     # 10 points in a circle
     angles = np.linspace(0, 2 * np.pi, 10, endpoint=False)
     coords = np.stack([np.cos(angles), np.sin(angles)], axis=-1).astype(np.float64)
@@ -32,7 +32,7 @@ def test_lkh_optimize_circle():
     assert np.isclose(optimized_length, seq_length) or optimized_length < initial_length
 
 
-def test_lkh_locked_edges():
+def test_lkh_locked_edges() -> None:
     # 4 points in a square
     coords = np.array(
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], dtype=np.float64

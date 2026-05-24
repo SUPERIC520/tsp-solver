@@ -3,7 +3,7 @@ from src.core.validation import compute_hk_lower_bound, validate_result
 from src.core.preprocessing import build_candidate_sets
 
 
-def test_compute_hk_lower_bound_square():
+def test_compute_hk_lower_bound_square() -> None:
     # 4 points in a square
     coords = np.array(
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], dtype=np.float64
@@ -17,6 +17,6 @@ def test_compute_hk_lower_bound_square():
     assert lb <= 4.000001
 
 
-def test_validate_result():
+def test_validate_result() -> None:
     gap = validate_result(101.0, 100.0)
     assert np.isclose(gap, 1.0)

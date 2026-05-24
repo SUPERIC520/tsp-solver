@@ -2,7 +2,7 @@ import numpy as np
 from src.core.orchestration import parallel_solve
 
 
-def test_parallel_solve_basic():
+def test_parallel_solve_basic() -> None:
     # Small problem
     n = 20
     coords = np.random.rand(n, 2).astype(np.float64)

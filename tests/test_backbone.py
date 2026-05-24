@@ -2,7 +2,7 @@ import numpy as np
 from src.core.backbone import extract_consensus_edges
 
 
-def test_extract_consensus_edges():
+def test_extract_consensus_edges() -> None:
     # 4 points, 3 identical tours and 1 different
     tours = np.array(
         [[0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 1, 3]], dtype=np.int32

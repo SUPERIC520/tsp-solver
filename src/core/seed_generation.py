@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit  # type: ignore
+from numba import njit
 from typing import Any
 
 
@@ -102,5 +102,82 @@ def generate_hilbert_seeds(
         transformed_coords = coords.copy()
         transformed_coords += np.random.normal(0, 1e-6, transformed_coords.shape)
         seeds[i] = _get_hilbert_indices(transformed_coords)
+
+    return seeds
+
+
+@njit(fastmath=True, cache=True)  # type: ignore
+def _greedy_nn_tour(
+    coords: np.ndarray,
+    candidate_set: np.ndarray,
+    start: int,
+) -> np.ndarray:
+    """
+    Build a greedy nearest-neighbor tour starting from `start`.
+    Uses the candidate set for O(N*k) construction instead of O(N^2).
+    Falls back to a linear scan for any node not reachable via candidates.
+    """
+    n = coords.shape[0]
+    tour = np.empty(n, dtype=np.int32)
+    visited = np.zeros(n, dtype=np.bool_)
+
+    tour[0] = start
+    visited[start] = True
+
+    for step in range(1, n):
+        curr = tour[step - 1]
+        best_d = np.inf
+        best_next = -1
+
+        # Search candidate set first
+        for k in range(candidate_set.shape[1]):
+            nxt = candidate_set[curr, k]
+            if nxt == -1:
+                break
+            if not visited[nxt]:
+                dx = coords[curr, 0] - coords[nxt, 0]
+                dy = coords[curr, 1] - coords[nxt, 1]
+                d = dx * dx + dy * dy
+                if d < best_d:
+                    best_d = d
+                    best_next = nxt
+
+        # Fallback: linear scan if no unvisited candidate found
+        if best_next == -1:
+            for j in range(n):
+                if not visited[j]:
+                    dx = coords[curr, 0] - coords[j, 0]
+                    dy = coords[curr, 1] - coords[j, 1]
+                    d = dx * dx + dy * dy
+                    if d < best_d:
+                        best_d = d
+                        best_next = j
+
+        tour[step] = best_next
+        visited[best_next] = True
+
+    return tour
+
+
+def generate_greedy_nn_seeds(
+    coords: np.ndarray,
+    candidate_set: np.ndarray,
+    num_seeds: int = 1,
+    start_nodes: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Generate greedy nearest-neighbor seeds from diverse starting cities.
+    Useful for complementing Hilbert seeds with different basin exploration.
+    """
+    n = coords.shape[0]
+    seeds = np.empty((num_seeds, n), dtype=np.int32)
+
+    if start_nodes is None:
+        # Space starting nodes evenly across the tour
+        step = max(1, n // num_seeds)
+        start_nodes = np.array([i * step for i in range(num_seeds)], dtype=np.int32)
+
+    for i in range(num_seeds):
+        seeds[i] = _greedy_nn_tour(coords, candidate_set, int(start_nodes[i]))
 
     return seeds

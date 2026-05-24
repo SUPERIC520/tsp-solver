@@ -2,7 +2,7 @@ import numpy as np
 from src.core.preprocessing import build_candidate_sets
 
 
-def test_build_candidate_sets_simple():
+def test_build_candidate_sets_simple() -> None:
     # 4 points in a square
     coords = np.array(
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], dtype=np.float64
@@ -18,7 +18,7 @@ def test_build_candidate_sets_simple():
     assert set(c_set[1]) == {0, 2}
 
 
-def test_build_candidate_sets_grid():
+def test_build_candidate_sets_grid() -> None:
     # 3x3 grid
     x = np.linspace(0, 2, 3)
     y = np.linspace(0, 2, 3)
@@ -37,15 +37,15 @@ def test_build_candidate_sets_grid():
     assert center_neighbors == {1, 3, 5, 7}
 
 
-def test_build_candidate_sets_10_cities():
+def test_build_candidate_sets_10_cities() -> None:
     # 10 cities in a 2x5 grid
     # (0,0) (1,0) (2,0) (3,0) (4,0)
     # (0,1) (1,1) (2,1) (3,1) (4,1)
-    coords = []
+    coords_list = []
     for y in range(2):
         for x in range(5):
-            coords.append([float(x), float(y)])
-    coords = np.array(coords, dtype=np.float64)
+            coords_list.append([float(x), float(y)])
+    coords = np.array(coords_list, dtype=np.float64)
 
     k = 3
     c_set = build_candidate_sets(coords, k=k)

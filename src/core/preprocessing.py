@@ -1,8 +1,90 @@
 import numpy as np
-from scipy.spatial import Delaunay, KDTree  # type: ignore
-from numba import njit, prange  # type: ignore
-from typing import Any, cast
+from scipy.spatial import KDTree
+from numba import njit, prange
+from typing import Any, cast, Tuple
 from src.core.validation import compute_alpha_values
+
+
+@njit(cache=True)  # type: ignore
+def _xy2d(n: int, x: int, y: int) -> int:
+    """
+    Convert (x, y) to d (distance along Hilbert curve).
+    n must be a power of 2.
+    """
+    d = 0
+    s = n // 2
+    while s > 0:
+        rx = (x & s) > 0
+        ry = (y & s) > 0
+        d += s * s * ((3 * int(rx)) ^ int(ry))
+
+        # Rotate/flip
+        if ry == 0:
+            if rx == 1:
+                x = s - 1 - x
+                y = s - 1 - y
+            x, y = y, x
+        s //= 2
+    return d
+
+
+@njit(cache=True)  # type: ignore
+def get_hilbert_indices(
+    coords: np.ndarray,
+) -> np.ndarray:
+    """
+    Sort indices based on Hilbert curve.
+    """
+    num_points = coords.shape[0]
+    if num_points == 0:
+        return np.zeros(0, dtype=np.int32)
+
+    # Normalize coordinates to [0, 2^k - 1]
+    min_x, min_y = np.inf, np.inf
+    max_x, max_y = -np.inf, -np.inf
+
+    for i in range(num_points):
+        if coords[i, 0] < min_x:
+            min_x = coords[i, 0]
+        if coords[i, 1] < min_y:
+            min_y = coords[i, 1]
+        if coords[i, 0] > max_x:
+            max_x = coords[i, 0]
+        if coords[i, 1] > max_y:
+            max_y = coords[i, 1]
+
+    range_x = max_x - min_x
+    range_y = max_y - min_y
+    max_range = max(range_x, range_y)
+
+    if max_range == 0:
+        return np.arange(num_points, dtype=np.int32)
+
+    # Choose n as a power of 2 large enough for precision
+    n = 2**20
+
+    hilbert_distances = np.empty(num_points, dtype=np.int64)
+    for i in range(num_points):
+        ix = int((coords[i, 0] - min_x) / max_range * (n - 1))
+        iy = int((coords[i, 1] - min_y) / max_range * (n - 1))
+        hilbert_distances[i] = _xy2d(n, ix, iy)
+
+    return np.argsort(hilbert_distances).astype(np.int32)
+
+
+def hilbert_reorder_cities(coords: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Reorder cities according to a Hilbert curve to improve cache locality.
+    Returns (reordered_coords, original_to_new_mapping).
+    """
+    indices = get_hilbert_indices(coords)
+    reordered_coords = coords[indices].copy()
+    
+    n = coords.shape[0]
+    original_to_new = np.empty(n, dtype=np.int32)
+    original_to_new[indices] = np.arange(n, dtype=np.int32)
+    
+    return reordered_coords, original_to_new
 
 
 @njit(parallel=True, fastmath=True, cache=True)  # type: ignore
@@ -115,28 +197,15 @@ def _filter_nearest_neighbors(
 
 def build_candidate_sets(coords: np.ndarray, k: int = 16) -> np.ndarray:
     """
-    Build candidate sets using Delaunay triangulation,
-    filled with KDTree nearest neighbors up to k.
-    Accelerated with Numba.
+    Build candidate sets using KDTree nearest neighbors.
+    Bypasses Delaunay triangulation entirely.
     """
     n = coords.shape[0]
-    # Delaunay triangulation for geometric neighbors
-    tri = Delaunay(coords)
-    indptr, indices = tri.vertex_neighbor_vertices
-
-    # KDTree for nearest neighbor filling
     tree = KDTree(coords)
     _, kdtree_indices = tree.query(coords, k=min(k + 1, n))
-
-    # Numba-accelerated filtering and merging
-    candidate_set = _filter_nearest_neighbors(
-        coords.astype(np.float64),
-        indptr.astype(np.int32),
-        indices.astype(np.int32),
-        kdtree_indices.astype(np.int32),
-        k,
-    )
-
+    
+    # Slice off the first neighbor (which is the node itself)
+    candidate_set = kdtree_indices[:, 1:].astype(np.int32)
     return cast(np.ndarray, candidate_set)
 
 

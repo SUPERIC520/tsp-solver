@@ -2,7 +2,7 @@ import numpy as np
 from src.core.seed_generation import generate_hilbert_seeds
 
 
-def test_generate_hilbert_seeds():
+def test_generate_hilbert_seeds() -> None:
     # 100 random points
     coords = np.random.rand(100, 2).astype(np.float64)
     num_seeds = 8

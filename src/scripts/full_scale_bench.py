@@ -18,7 +18,7 @@ import multiprocessing as mp
 from typing import Tuple, Optional
 from src.utils.data_io import load_cities
 from src.core.preprocessing import build_candidate_sets, refine_candidate_set_with_alpha
-from src.core.seed_generation import generate_hilbert_seeds
+from src.core.seed_generation import generate_hilbert_seeds, generate_greedy_nn_seeds
 from src.core.orchestration import parallel_solve
 from src.core.backbone import extract_consensus_edges
 from src.core.validation import compute_hk_lower_bound, validate_result
@@ -45,6 +45,8 @@ def save_cached_hk(n_sample: int, hk: float, pi: np.ndarray) -> None:
 def warmup() -> None:
     print("Warming up JIT...")
     coords = np.array([[0, 0], [1, 0], [1, 1], [0, 1], [0.5, 0.5]], dtype=np.float64)
+    coords_x = coords[:, 0]
+    coords_y = coords[:, 1]
     cs = np.array(
         [[1, 3, 4], [0, 2, 4], [1, 3, 4], [0, 2, 4], [0, 1, 2]], dtype=np.int32
     )
@@ -53,7 +55,8 @@ def warmup() -> None:
     locked = np.full((5, 2), -1, dtype=np.int32)
     cascading_kopt_optimize(
         np.array([0, 1, 2, 3, 4], dtype=np.int32),
-        coords,
+        coords_x,
+        coords_y,
         cs,
         locked,
         num_kicks=2,
@@ -72,6 +75,9 @@ def run_full_scale_bench(
     force_hk: bool = False,
     no_backbone: bool = False,
     backbone_threshold: float = 0.99,
+    time_limit: float = -1.0,
+    num_greedy_seeds: int = 0,
+    candidate_k: int = 40,
 ) -> Tuple[float, float]:
     warmup()
     start_total = time.time()
@@ -80,7 +86,7 @@ def run_full_scale_bench(
     print(
         f"Params: seeds={num_seeds}, kicks={num_kicks}, iters={num_iterations}, "
         f"hk_iter={hk_iter}, max_opt={max_opt}, backbone_threshold={backbone_threshold}, "
-        f"no_backbone={no_backbone}"
+        f"no_backbone={no_backbone}, candidate_k={candidate_k}"
     )
 
     # 1. Load Data
@@ -92,7 +98,7 @@ def run_full_scale_bench(
     # 2. Preprocessing
     print("Step 2: Building initial candidate sets (Delaunay+KDTree)...")
     start_pre = time.time()
-    candidate_set = build_candidate_sets(coords, k=32)
+    candidate_set = build_candidate_sets(coords, k=max(64, candidate_k))
     print(f"Initial preprocessing done in {time.time() - start_pre:.2f}s.")
 
     print(
@@ -112,15 +118,22 @@ def run_full_scale_bench(
         print(f"Loaded cached HK lower bound: {lb_val:.2f}")
 
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
-    # Keep top 40 after refinement for better quality vs speed trade-off
-    candidate_set = candidate_set[:, :40]
+    # Keep top candidate_k after refinement
+    candidate_set = candidate_set[:, :candidate_k]
     print(
         f"Alpha refinement done in {time.time() - start_alpha:.2f}s. HK Lower Bound: {lb_val:.2f}"
     )
 
-    # 3. Seed Generation
-    print(f"Step 3: Generating {num_seeds} Hilbert seeds...")
-    seeds = generate_hilbert_seeds(coords, num_seeds=num_seeds)
+    # 3. Seed Generation: mix Hilbert + greedy NN seeds for basin diversity
+    num_hilbert = num_seeds - num_greedy_seeds
+    print(f"Step 3: Generating {num_hilbert} Hilbert + {num_greedy_seeds} greedy-NN seeds ({num_seeds} total)...")
+    seeds_list = []
+    if num_hilbert > 0:
+        seeds_list.append(generate_hilbert_seeds(coords, num_seeds=num_hilbert))
+    if num_greedy_seeds > 0:
+        greedy = generate_greedy_nn_seeds(coords, candidate_set, num_seeds=num_greedy_seeds)
+        seeds_list.append(greedy)
+    seeds = np.vstack(seeds_list) if len(seeds_list) > 1 else seeds_list[0]
 
     # 4. Iterative Optimization
     # Backbone disabled: threshold=0.99 means virtually no edges are locked at full scale
@@ -137,6 +150,15 @@ def run_full_scale_bench(
         print(f"\nIteration {iter_idx + 1}/{num_iterations}")
 
         start_iter = time.time()
+        # Derive per-seed time limit: subtract elapsed preprocessing time and split
+        # remaining budget evenly across iterations (each runs sequentially).
+        if time_limit > 0:
+            elapsed_so_far = time.time() - start_total
+            remaining = time_limit - elapsed_so_far
+            # Divide remaining by remaining iterations; keep a small buffer.
+            per_seed_limit = max(10.0, remaining / (num_iterations - iter_idx) - 5.0)
+        else:
+            per_seed_limit = -1.0
         results = parallel_solve(
             seeds,
             coords,
@@ -145,6 +167,7 @@ def run_full_scale_bench(
             num_processes=num_processes,
             num_kicks=num_kicks,
             max_opt=max_opt,
+            time_limit_s=per_seed_limit,
         )
         print(f"Parallel solve completed in {time.time() - start_iter:.2f}s.")
 
@@ -232,6 +255,24 @@ if __name__ == "__main__":
         default=0.99,
         help="Fraction of tours that must share an edge to lock it (default: 0.99)",
     )
+    parser.add_argument(
+        "--time_limit",
+        type=float,
+        default=-1.0,
+        help="Total wall-clock time limit in seconds. Workers stop gracefully before this. -1 = unlimited.",
+    )
+    parser.add_argument(
+        "--greedy_seeds",
+        type=int,
+        default=0,
+        help="Number of greedy nearest-neighbor seeds to mix with Hilbert seeds (default: 0).",
+    )
+    parser.add_argument(
+        "--candidate_k",
+        type=int,
+        default=40,
+        help="Number of candidate neighbors to keep after alpha-refinement (default: 40).",
+    )
     args = parser.parse_args()
 
     run_full_scale_bench(
@@ -244,4 +285,7 @@ if __name__ == "__main__":
         force_hk=args.force_hk,
         no_backbone=args.no_backbone,
         backbone_threshold=args.backbone_threshold,
+        time_limit=args.time_limit,
+        num_greedy_seeds=args.greedy_seeds,
+        candidate_k=args.candidate_k,
     )

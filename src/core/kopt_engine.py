@@ -1,24 +1,26 @@
 import numpy as np
-from numba import njit  # type: ignore
+import time
 from typing import Tuple
+from numba import njit, prange
 
 
-@njit(inline="always")  # type: ignore
-def _dist(c1: int, c2: int, coords: np.ndarray) -> float:
-    dx = coords[c1, 0] - coords[c2, 0]
-    dy = coords[c1, 1] - coords[c2, 1]
+@njit(inline="always", fastmath=True)  # type: ignore
+def _dist(c1: int, c2: int, coords_x: np.ndarray, coords_y: np.ndarray) -> float:
+    dx = coords_x[c1] - coords_x[c2]
+    dy = coords_y[c1] - coords_y[c2]
     return float(np.sqrt(dx * dx + dy * dy))
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
 def compute_tour_length(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
 ) -> float:
     length = 0.0
     n = tour.shape[0]
     for i in range(n):
-        length += _dist(tour[i], tour[(i + 1) % n], coords)
+        length += _dist(tour[i], tour[(i + 1) % n], coords_x, coords_y)
     return float(length)
 
 
@@ -45,8 +47,10 @@ def _update_pos(tour: np.ndarray, pos: np.ndarray) -> None:
 @njit(fastmath=True, cache=True)  # type: ignore
 def _optimize_2opt(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -64,7 +68,7 @@ def _optimize_2opt(
         if locked_edges[u, 0] == v or locked_edges[u, 1] == v:
             continue
 
-        dist_uv = _dist(u, v, coords)
+        dist_uv = _dist(u, v, coords_x, coords_y)
         found = False
         for k in range(candidate_set.shape[1]):
             w = candidate_set[u, k]
@@ -72,7 +76,7 @@ def _optimize_2opt(
                 break
             if w == u or w == v:
                 continue
-            dist_uw = _dist(u, w, coords)
+            dist_uw = candidate_dists[u, k]
             if dist_uw >= dist_uv:
                 continue
 
@@ -84,7 +88,10 @@ def _optimize_2opt(
             if locked_edges[w, 0] == x or locked_edges[w, 1] == x:
                 continue
 
-            if dist_uv + _dist(w, x, coords) > dist_uw + _dist(v, x, coords) + 1e-9:
+            if (
+                dist_uv + _dist(w, x, coords_x, coords_y)
+                > dist_uw + _dist(v, x, coords_x, coords_y) + 1e-9
+            ):
                 _apply_2opt(tour, v_idx, w_idx)
                 _update_pos(tour, pos)
                 dlb[u] = dlb[v] = dlb[w] = dlb[x] = False
@@ -209,8 +216,10 @@ def _reconstruct_tour_3opt(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _optimize_3opt_sequential(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -230,7 +239,7 @@ def _optimize_3opt_sequential(
         t2 = tour[t2_idx]
         if locked_edges[t1, 0] == t2 or locked_edges[t1, 1] == t2:
             continue
-        dist_t1_t2 = _dist(t1, t2, coords)
+        dist_t1_t2 = _dist(t1, t2, coords_x, coords_y)
 
         found = False
         for k3 in range(num_cand):
@@ -239,7 +248,7 @@ def _optimize_3opt_sequential(
                 break
             if t3 == t1 or t3 == t2:
                 continue
-            dist_t2_t3 = _dist(t2, t3, coords)
+            dist_t2_t3 = candidate_dists[t2, k3]
             g1 = dist_t1_t2 - dist_t2_t3
             if g1 <= 1e-9:
                 continue
@@ -252,7 +261,7 @@ def _optimize_3opt_sequential(
                     continue
                 if locked_edges[t3, 0] == t4 or locked_edges[t3, 1] == t4:
                     continue
-                dist_t3_t4 = _dist(t3, t4, coords)
+                dist_t3_t4 = _dist(t3, t4, coords_x, coords_y)
 
                 for k5 in range(num_cand):
                     t5 = candidate_set[t4, k5]
@@ -260,7 +269,7 @@ def _optimize_3opt_sequential(
                         break
                     if t5 == t1 or t5 == t2 or t5 == t3 or t5 == t4:
                         continue
-                    dist_t4_t5 = _dist(t4, t5, coords)
+                    dist_t4_t5 = candidate_dists[t4, k5]
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
                     if g2 <= 1e-9:
                         continue
@@ -310,9 +319,9 @@ def _optimize_3opt_sequential(
                             continue
 
                         E_remove = (
-                            _dist(a, b, coords)
-                            + _dist(c, d, coords)
-                            + _dist(e, f, coords)
+                            _dist(a, b, coords_x, coords_y)
+                            + _dist(c, d, coords_x, coords_y)
+                            + _dist(e, f, coords_x, coords_y)
                         )
 
                         best_case = -1
@@ -320,9 +329,9 @@ def _optimize_3opt_sequential(
 
                         # Case 4
                         d4 = (
-                            _dist(c, e, coords)
-                            + _dist(d, a, coords)
-                            + _dist(f, b, coords)
+                            _dist(c, e, coords_x, coords_y)
+                            + _dist(d, a, coords_x, coords_y)
+                            + _dist(f, b, coords_x, coords_y)
                             - E_remove
                         )
                         if d4 < best_delta:
@@ -331,9 +340,9 @@ def _optimize_3opt_sequential(
 
                         # Case 5
                         d5 = (
-                            _dist(c, f, coords)
-                            + _dist(a, d, coords)
-                            + _dist(e, b, coords)
+                            _dist(c, f, coords_x, coords_y)
+                            + _dist(a, d, coords_x, coords_y)
+                            + _dist(e, b, coords_x, coords_y)
                             - E_remove
                         )
                         if d5 < best_delta:
@@ -342,9 +351,9 @@ def _optimize_3opt_sequential(
 
                         # Case 6
                         d6 = (
-                            _dist(c, a, coords)
-                            + _dist(f, d, coords)
-                            + _dist(e, b, coords)
+                            _dist(c, a, coords_x, coords_y)
+                            + _dist(f, d, coords_x, coords_y)
+                            + _dist(e, b, coords_x, coords_y)
                             - E_remove
                         )
                         if d6 < best_delta:
@@ -353,9 +362,9 @@ def _optimize_3opt_sequential(
 
                         # Case 7
                         d7 = (
-                            _dist(c, f, coords)
-                            + _dist(a, e, coords)
-                            + _dist(d, b, coords)
+                            _dist(c, f, coords_x, coords_y)
+                            + _dist(a, e, coords_x, coords_y)
+                            + _dist(d, b, coords_x, coords_y)
                             - E_remove
                         )
                         if d7 < best_delta:
@@ -364,9 +373,9 @@ def _optimize_3opt_sequential(
 
                         # Case 8
                         d8 = (
-                            _dist(c, a, coords)
-                            + _dist(f, e, coords)
-                            + _dist(d, b, coords)
+                            _dist(c, a, coords_x, coords_y)
+                            + _dist(f, e, coords_x, coords_y)
+                            + _dist(d, b, coords_x, coords_y)
                             - E_remove
                         )
                         if d8 < best_delta:
@@ -398,8 +407,10 @@ def _optimize_3opt_sequential(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _optimize_or_opt(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -432,7 +443,9 @@ def _optimize_or_opt(
                 continue
 
             base_g = (
-                _dist(p_u, u, coords) + _dist(v, s_v, coords) - _dist(p_u, s_v, coords)
+                _dist(p_u, u, coords_x, coords_y)
+                + _dist(v, s_v, coords_x, coords_y)
+                - _dist(p_u, s_v, coords_x, coords_y)
             )
             if base_g <= 1e-9:
                 continue
@@ -461,31 +474,21 @@ def _optimize_or_opt(
                 if locked_edges[w, 0] == s_w or locked_edges[w, 1] == s_w:
                     continue
 
+                dist_wu = candidate_dists[u, k]
                 if (
-                    base_g + _dist(w, s_w, coords)
-                    > _dist(w, u, coords) + _dist(v, s_w, coords) + 1e-9
+                    base_g + _dist(w, s_w, coords_x, coords_y)
+                    > dist_wu + _dist(v, s_w, coords_x, coords_y) + 1e-9
                 ):
                     # Relocate segment [u, v] (indices i_idx to j_idx) to after w
-                    # This is done by 3 reversals:
-                    # 1. Reverse [i_idx, j_idx]
-                    # 2. Reverse [s_v_idx, w_idx]
-                    # 3. Reverse [i_idx, w_idx]
-                    # This works if i_idx < j_idx < w_idx.
-                    # If not, we need to handle wrap-around, but for simplicity
-                    # we can just use a temporary buffer if it wraps.
-
                     if i_idx <= j_idx < w_idx:
                         _apply_2opt(tour, i_idx, j_idx)
                         _apply_2opt(tour, s_v_idx, w_idx)
                         _apply_2opt(tour, i_idx, w_idx)
                     elif w_idx < i_idx <= j_idx:
-                        # Relocating [i, j] to after w (where w < i)
-                        # This is swapping segment [i, j] with [s_w, p_u]
                         _apply_2opt(tour, i_idx, j_idx)
                         _apply_2opt(tour, s_w_idx, p_u_idx)
                         _apply_2opt(tour, s_w_idx, j_idx)
                     else:
-                        # Complex wrap-around case, skip for now or use temporary
                         continue
 
                     _update_pos(tour, pos)
@@ -520,19 +523,16 @@ def _optimize_or_opt(
                     if locked_edges[w, 0] == s_w or locked_edges[w, 1] == s_w:
                         continue
 
+                    dist_wv = candidate_dists[v, k]
                     # Reversed insertion: connect w->v and u->s_w instead of w->u and v->s_w
                     if (
-                        base_g + _dist(w, s_w, coords)
-                        > _dist(w, v, coords) + _dist(u, s_w, coords) + 1e-9
+                        base_g + _dist(w, s_w, coords_x, coords_y)
+                        > dist_wv + _dist(u, s_w, coords_x, coords_y) + 1e-9
                     ):
                         if i_idx <= j_idx < w_idx:
-                            # Reverse the segment first so it is inserted reversed
-                            _apply_2opt(tour, i_idx, j_idx)
-                            # Now segment runs from v..u; re-grab s_v and p_u positions
                             _apply_2opt(tour, s_v_idx, w_idx)
                             _apply_2opt(tour, i_idx, w_idx)
                         elif w_idx < i_idx <= j_idx:
-                            _apply_2opt(tour, i_idx, j_idx)
                             _apply_2opt(tour, s_w_idx, p_u_idx)
                             _apply_2opt(tour, s_w_idx, j_idx)
                         else:
@@ -572,8 +572,10 @@ def _apply_2opt_indices(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _optimize_4opt_sequential(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -593,7 +595,7 @@ def _optimize_4opt_sequential(
         t2 = tour[t2_idx]
         if locked_edges[t1, 0] == t2 or locked_edges[t1, 1] == t2:
             continue
-        dist_t1_t2 = _dist(t1, t2, coords)
+        dist_t1_t2 = _dist(t1, t2, coords_x, coords_y)
 
         found = False
         for k3 in range(num_cand):
@@ -602,7 +604,7 @@ def _optimize_4opt_sequential(
                 break
             if t3 == t1 or t3 == t2:
                 continue
-            dist_t2_t3 = _dist(t2, t3, coords)
+            dist_t2_t3 = candidate_dists[t2, k3]
             g1 = dist_t1_t2 - dist_t2_t3
             if g1 <= 1e-9:
                 continue
@@ -615,7 +617,7 @@ def _optimize_4opt_sequential(
                     continue
                 if locked_edges[t3, 0] == t4 or locked_edges[t3, 1] == t4:
                     continue
-                dist_t3_t4 = _dist(t3, t4, coords)
+                dist_t3_t4 = _dist(t3, t4, coords_x, coords_y)
 
                 for k5 in range(num_cand):
                     t5 = candidate_set[t4, k5]
@@ -623,7 +625,7 @@ def _optimize_4opt_sequential(
                         break
                     if t5 == t1 or t5 == t2 or t5 == t3 or t5 == t4:
                         continue
-                    dist_t4_t5 = _dist(t4, t5, coords)
+                    dist_t4_t5 = candidate_dists[t4, k5]
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
                     if g2 <= 1e-9:
                         continue
@@ -636,7 +638,7 @@ def _optimize_4opt_sequential(
                             continue
                         if locked_edges[t5, 0] == t6 or locked_edges[t5, 1] == t6:
                             continue
-                        dist_t5_t6 = _dist(t5, t6, coords)
+                        dist_t5_t6 = _dist(t5, t6, coords_x, coords_y)
 
                         for k7 in range(num_cand):
                             t7 = candidate_set[t6, k7]
@@ -651,7 +653,7 @@ def _optimize_4opt_sequential(
                                 or t7 == t6
                             ):
                                 continue
-                            dist_t6_t7 = _dist(t6, t7, coords)
+                            dist_t6_t7 = candidate_dists[t6, k7]
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
                             if g3 <= 1e-9:
                                 continue
@@ -675,9 +677,9 @@ def _optimize_4opt_sequential(
                                     or locked_edges[t7, 1] == t8
                                 ):
                                     continue
-                                dist_t7_t8 = _dist(t7, t8, coords)
+                                dist_t7_t8 = _dist(t7, t8, coords_x, coords_y)
 
-                                gain = g3 + dist_t7_t8 - _dist(t8, t1, coords)
+                                gain = g3 + dist_t7_t8 - _dist(t8, t1, coords_x, coords_y)
                                 if gain > 1e-9:
                                     _apply_2opt_indices(
                                         tour, t1_idx, t2_idx, t3_idx, t4_idx
@@ -716,8 +718,10 @@ def _optimize_4opt_sequential(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _optimize_5opt_sequential(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -737,7 +741,7 @@ def _optimize_5opt_sequential(
         t2 = tour[t2_idx]
         if locked_edges[t1, 0] == t2 or locked_edges[t1, 1] == t2:
             continue
-        dist_t1_t2 = _dist(t1, t2, coords)
+        dist_t1_t2 = _dist(t1, t2, coords_x, coords_y)
 
         found = False
         for k3 in range(num_cand):
@@ -746,7 +750,7 @@ def _optimize_5opt_sequential(
                 break
             if t3 == t1 or t3 == t2:
                 continue
-            dist_t2_t3 = _dist(t2, t3, coords)
+            dist_t2_t3 = candidate_dists[t2, k3]
             g1 = dist_t1_t2 - dist_t2_t3
             if g1 <= 1e-9:
                 continue
@@ -759,7 +763,7 @@ def _optimize_5opt_sequential(
                     continue
                 if locked_edges[t3, 0] == t4 or locked_edges[t3, 1] == t4:
                     continue
-                dist_t3_t4 = _dist(t3, t4, coords)
+                dist_t3_t4 = _dist(t3, t4, coords_x, coords_y)
 
                 for k5 in range(num_cand):
                     t5 = candidate_set[t4, k5]
@@ -767,7 +771,7 @@ def _optimize_5opt_sequential(
                         break
                     if t5 == t1 or t5 == t2 or t5 == t3 or t5 == t4:
                         continue
-                    dist_t4_t5 = _dist(t4, t5, coords)
+                    dist_t4_t5 = candidate_dists[t4, k5]
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
                     if g2 <= 1e-9:
                         continue
@@ -780,7 +784,7 @@ def _optimize_5opt_sequential(
                             continue
                         if locked_edges[t5, 0] == t6 or locked_edges[t5, 1] == t6:
                             continue
-                        dist_t5_t6 = _dist(t5, t6, coords)
+                        dist_t5_t6 = _dist(t5, t6, coords_x, coords_y)
 
                         for k7 in range(num_cand):
                             t7 = candidate_set[t6, k7]
@@ -795,7 +799,7 @@ def _optimize_5opt_sequential(
                                 or t7 == t6
                             ):
                                 continue
-                            dist_t6_t7 = _dist(t6, t7, coords)
+                            dist_t6_t7 = candidate_dists[t6, k7]
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
                             if g3 <= 1e-9:
                                 continue
@@ -819,7 +823,7 @@ def _optimize_5opt_sequential(
                                     or locked_edges[t7, 1] == t8
                                 ):
                                     continue
-                                dist_t7_t8 = _dist(t7, t8, coords)
+                                dist_t7_t8 = _dist(t7, t8, coords_x, coords_y)
 
                                 for k9 in range(num_cand):
                                     t9 = candidate_set[t8, k9]
@@ -836,7 +840,7 @@ def _optimize_5opt_sequential(
                                         or t9 == t8
                                     ):
                                         continue
-                                    dist_t8_t9 = _dist(t8, t9, coords)
+                                    dist_t8_t9 = candidate_dists[t8, k9]
                                     g4 = g3 + dist_t7_t8 - dist_t8_t9
                                     if g4 <= 1e-9:
                                         continue
@@ -862,9 +866,9 @@ def _optimize_5opt_sequential(
                                             or locked_edges[t9, 1] == t10
                                         ):
                                             continue
-                                        dist_t9_t10 = _dist(t9, t10, coords)
+                                        dist_t9_t10 = _dist(t9, t10, coords_x, coords_y)
 
-                                        gain = g4 + dist_t9_t10 - _dist(t10, t1, coords)
+                                        gain = g4 + dist_t9_t10 - _dist(t10, t1, coords_x, coords_y)
                                         if gain > 1e-9:
                                             _apply_2opt_indices(
                                                 tour, t1_idx, t2_idx, t3_idx, t4_idx
@@ -917,8 +921,10 @@ def _optimize_5opt_sequential(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _full_cascade(
     tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
     pos: np.ndarray,
     dlb: np.ndarray,
@@ -927,37 +933,40 @@ def _full_cascade(
     improved = True
     while improved:
         improved = False
-        if _optimize_2opt(tour, coords, candidate_set, locked_edges, pos, dlb):
+        if _optimize_2opt(
+            tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb
+        ):
             improved = True
-            while _optimize_2opt(tour, coords, candidate_set, locked_edges, pos, dlb):
+            while _optimize_2opt(
+                tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb
+            ):
                 pass
 
         # Or-opt search
         if _optimize_or_opt(
-            tour, coords, candidate_set, locked_edges, pos, dlb, max_len=5
+            tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb, max_len=5
         ):
             improved = True
             continue
 
         # Or-opt and 3-opt sequential
         if max_opt >= 3:
-            # We use a combined search for 3-opt
             if _optimize_3opt_sequential(
-                tour, coords, candidate_set, locked_edges, pos, dlb
+                tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb
             ):
                 improved = True
                 continue
 
         if max_opt >= 4:
             if _optimize_4opt_sequential(
-                tour, coords, candidate_set, locked_edges, pos, dlb
+                tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb
             ):
                 improved = True
                 continue
 
         if max_opt >= 5:
             if _optimize_5opt_sequential(
-                tour, coords, candidate_set, locked_edges, pos, dlb
+                tour, coords_x, coords_y, candidate_set, candidate_dists, locked_edges, pos, dlb
             ):
                 improved = True
                 continue
@@ -968,11 +977,23 @@ def _double_bridge_kick(tour: np.ndarray) -> None:
     n = tour.shape[0]
     if n < 8:
         return
-    # Choose 4 random positions to cut the tour into 4 segments
-    # p1 < p2 < p3 < p4
-    indices = np.random.choice(n, 4, replace=False)
-    indices.sort()
-    p1, p2, p3, p4 = indices[0], indices[1], indices[2], indices[3]
+    
+    # Choose 4 positions to cut the tour.
+    # For large tours, use a localized window to avoid creating long, unrepairable edges.
+    if n <= 1000:
+        indices = np.random.choice(n, 4, replace=False)
+        indices.sort()
+        p1, p2, p3, p4 = indices[0], indices[1], indices[2], indices[3]
+    else:
+        # Localized kick
+        W = min(500, max(100, n // 20))
+        start = np.random.randint(0, n - W)
+        offsets = np.random.choice(W, 4, replace=False)
+        offsets.sort()
+        p1 = start + offsets[0]
+        p2 = start + offsets[1]
+        p3 = start + offsets[2]
+        p4 = start + offsets[3]
 
     # Tour segments: [0, p1], [p1+1, p2], [p2+1, p3], [p3+1, p4], [p4+1, n-1]
     # Reconnect as: [0, p1], [p3+1, p4], [p2+1, p3], [p1+1, p2], [p4+1, n-1]
@@ -997,27 +1018,35 @@ def _double_bridge_kick(tour: np.ndarray) -> None:
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
-def cascading_kopt_optimize(
+def _cascading_kopt_inner(
     initial_tour: np.ndarray,
-    coords: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
     candidate_set: np.ndarray,
+    candidate_dists: np.ndarray,
     locked_edges: np.ndarray,
-    num_kicks: int = 500,
-    max_opt: int = 3,
-) -> Tuple[np.ndarray, float]:
-    n = initial_tour.shape[0]
-    tour = initial_tour.copy()
+    num_kicks: int,
+    max_opt: int,
+    in_tour: np.ndarray,
+    in_best_tour: np.ndarray,
+    in_best_length: float,
+    in_stagnation_count: int,
+) -> Tuple[np.ndarray, np.ndarray, float, int]:
+    """
+    Inner @njit kick loop. Accepts externally-supplied state so the Python
+    wrapper can resume across chunk boundaries. Returns updated
+    (tour, best_tour, best_length, stagnation_count).
+    """
+    n = in_tour.shape[0]
+    tour = in_tour.copy()
+    best_tour = in_best_tour.copy()
+    best_length = in_best_length
+    stagnation_count = in_stagnation_count
+    stagnation_limit = max(50, n // 100)
+
     pos = np.empty(n, dtype=np.int32)
     _update_pos(tour, pos)
     dlb = np.zeros(n, dtype=np.bool_)
-
-    _full_cascade(tour, coords, candidate_set, locked_edges, pos, dlb, max_opt=max_opt)
-
-    best_tour = tour.copy()
-    best_length = compute_tour_length(tour, coords)
-
-    stagnation_count = 0
-    stagnation_limit = max(50, n // 100)
 
     for i in range(num_kicks):
         kicked_tour = tour.copy()
@@ -1025,10 +1054,17 @@ def cascading_kopt_optimize(
         _update_pos(kicked_tour, pos)
         dlb.fill(False)
         _full_cascade(
-            kicked_tour, coords, candidate_set, locked_edges, pos, dlb, max_opt=max_opt
+            kicked_tour,
+            coords_x,
+            coords_y,
+            candidate_set,
+            candidate_dists,
+            locked_edges,
+            pos,
+            dlb,
+            max_opt=max_opt,
         )
-
-        length = compute_tour_length(kicked_tour, coords)
+        length = compute_tour_length(kicked_tour, coords_x, coords_y)
         if length < best_length - 1e-9:
             best_length = length
             best_tour = kicked_tour.copy()
@@ -1037,9 +1073,108 @@ def cascading_kopt_optimize(
         else:
             stagnation_count += 1
             if stagnation_count > stagnation_limit:
-                # Reset to best tour and clear DLB for fresh search
                 tour = best_tour.copy()
                 dlb.fill(False)  # CRITICAL: clear DLB after reset!
                 stagnation_count = 0
 
-    return best_tour, float(best_length)
+    return tour, best_tour, best_length, stagnation_count
+
+
+@njit(fastmath=True, cache=True, parallel=True)  # type: ignore
+def _precompute_candidate_dists(
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
+    candidate_set: np.ndarray,
+) -> np.ndarray:
+    n, num_cand = candidate_set.shape
+    candidate_dists = np.zeros((n, num_cand), dtype=np.float64)
+    for i in prange(n):
+        for k in range(num_cand):
+            c_idx = candidate_set[i, k]
+            if c_idx != -1:
+                dx = coords_x[i] - coords_x[c_idx]
+                dy = coords_y[i] - coords_y[c_idx]
+                candidate_dists[i, k] = np.sqrt(dx * dx + dy * dy)
+    return candidate_dists
+
+
+def cascading_kopt_optimize(
+    initial_tour: np.ndarray,
+    coords_x: np.ndarray,
+    coords_y: np.ndarray,
+    candidate_set: np.ndarray,
+    locked_edges: np.ndarray,
+    num_kicks: int = 500,
+    max_opt: int = 3,
+    time_limit_s: float = -1.0,
+    chunk_size: int = 500,
+) -> Tuple[np.ndarray, float]:
+    """
+    Python-level wrapper around _cascading_kopt_inner.
+
+    Runs ILS in `chunk_size` kick batches. If `time_limit_s > 0`, stops
+    before starting the next chunk when elapsed wall time exceeds
+    `time_limit_s * 0.97` (3% safety margin), ensuring we never go over
+    budget.
+    """
+    # Byte alignment
+    coords_x = np.ascontiguousarray(coords_x, dtype=np.float64)
+    coords_y = np.ascontiguousarray(coords_y, dtype=np.float64)
+    candidate_set = np.ascontiguousarray(candidate_set, dtype=np.int32)
+    locked_edges = np.ascontiguousarray(locked_edges, dtype=np.int32)
+    initial_tour = np.ascontiguousarray(initial_tour, dtype=np.int32)
+
+    n = initial_tour.shape[0]
+
+    # Precompute candidate distances using parallel JIT
+    candidate_dists = _precompute_candidate_dists(coords_x, coords_y, candidate_set)
+    candidate_dists = np.ascontiguousarray(candidate_dists)
+
+    tour = initial_tour.copy()
+    pos = np.empty(n, dtype=np.int32)
+    _update_pos(tour, pos)
+    dlb = np.zeros(n, dtype=np.bool_)
+
+    # Initial local search before kicks
+    _full_cascade(
+        tour,
+        coords_x,
+        coords_y,
+        candidate_set,
+        candidate_dists,
+        locked_edges,
+        pos,
+        dlb,
+        max_opt=max_opt,
+    )
+
+    best_tour = tour.copy()
+    best_length = float(compute_tour_length(tour, coords_x, coords_y))
+    stagnation_count = 0
+
+    t_start = time.monotonic()
+    deadline = t_start + time_limit_s * 0.97 if time_limit_s > 0 else float("inf")
+
+    kicks_done = 0
+    while kicks_done < num_kicks:
+        # Check time budget before starting next chunk
+        if time.monotonic() >= deadline:
+            break
+        this_chunk = min(chunk_size, num_kicks - kicks_done)
+        tour, best_tour, best_length, stagnation_count = _cascading_kopt_inner(
+            initial_tour,
+            coords_x,
+            coords_y,
+            candidate_set,
+            candidate_dists,
+            locked_edges,
+            this_chunk,
+            max_opt,
+            tour,
+            best_tour,
+            best_length,
+            stagnation_count,
+        )
+        kicks_done += this_chunk
+
+    return best_tour, best_length

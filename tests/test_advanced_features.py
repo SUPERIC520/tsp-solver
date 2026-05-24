@@ -8,7 +8,7 @@ from src.core.validation import (
 from src.core.preprocessing import build_candidate_sets, refine_candidate_set_with_alpha
 
 
-def test_hk_pi_extraction():
+def test_hk_pi_extraction() -> None:
     # Create a simple square of cities
     coords = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
     candidate_set = build_candidate_sets(coords, k=3)
@@ -20,7 +20,7 @@ def test_hk_pi_extraction():
     assert lb > 0
 
 
-def test_alpha_calculation():
+def test_alpha_calculation() -> None:
     # Create 10 random cities
     np.random.seed(42)
     coords = np.random.rand(10, 2)
@@ -59,7 +59,7 @@ def test_alpha_calculation():
                     break
 
 
-def test_refine_candidate_set():
+def test_refine_candidate_set() -> None:
     np.random.seed(42)
     coords = np.random.rand(50, 2)
     n = 50

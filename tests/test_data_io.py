@@ -1,10 +1,11 @@
 import os
+from typing import Any
 import numpy as np
 from src.utils.data_io import load_cities, save_tour, load_tour
 from src.core.lkh_core import compute_tour_length
 
 
-def test_load_cities():
+def test_load_cities() -> None:
     filepath = "tests/data/sample_cities.csv"
     coords = load_cities(filepath)
 
@@ -14,7 +15,7 @@ def test_load_cities():
     assert np.allclose(coords[-1], [0.5, 0.5])
 
 
-def test_save_and_load_tour(tmp_path):
+def test_save_and_load_tour(tmp_path: Any) -> None:
     # Setup dummy data
     coords = np.array(
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.5, 0.5]], dtype=np.float64
