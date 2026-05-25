@@ -43,15 +43,28 @@ def save_tour(filepath: str, tour: np.ndarray, length: float) -> None:
 def load_tour(filepath: str) -> tuple[np.ndarray, float]:
     """
     Load a tour and its saved length from a file.
+    Supports simple file format (length\nindices) and CSV format (length,L\nindices,I1,I2...).
     Returns: (tour_indices, length)
     """
-    with open(filepath, "r") as f:
-        line1 = f.readline()
-        length = float(line1.split(": ")[1])
-        f.readline()  # Skip "Tour Indices:"
-        line3 = f.readline()
-        tour = np.array([int(i) for i in line3.split()], dtype=np.int32)
-    return tour, length
+    if filepath.endswith('.csv'):
+        # CSV format:
+        # length,L
+        # indices,I1,I2,...,IN
+        with open(filepath, "r") as f:
+            line1 = f.readline()
+            length = float(line1.split(",")[1])
+            line2 = f.readline()
+            tour = np.array([int(i) for i in line2.split(",")[1:]], dtype=np.int32)
+        return tour, length
+    else:
+        # Simple format
+        with open(filepath, "r") as f:
+            line1 = f.readline()
+            length = float(line1.split(": ")[1])
+            f.readline()  # Skip "Tour Indices:"
+            line3 = f.readline()
+            tour = np.array([int(i) for i in line3.split()], dtype=np.int32)
+        return tour, length
 
 
 def get_hk_cache_paths(sample_name: str) -> tuple[str, str]:

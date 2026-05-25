@@ -1,6 +1,7 @@
 import numpy as np
 import time
-from typing import Tuple
+import multiprocessing as mp
+from typing import Tuple, Optional
 from numba import njit, prange
 
 
@@ -1096,8 +1097,8 @@ def _precompute_candidate_dists(
                 dy = coords_y[i] - coords_y[c_idx]
                 candidate_dists[i, k] = np.sqrt(dx * dx + dy * dy)
     return candidate_dists
-
-
+from typing import Tuple, Optional, Any
+...
 def cascading_kopt_optimize(
     initial_tour: np.ndarray,
     coords_x: np.ndarray,
@@ -1107,16 +1108,16 @@ def cascading_kopt_optimize(
     num_kicks: int = 500,
     max_opt: int = 3,
     time_limit_s: float = -1.0,
-    chunk_size: int = 500,
-) -> Tuple[np.ndarray, float]:
+    chunk_size: int = 1,
+    progress_array: Any = None,
+    seed_idx: int = 0,
+) -> Tuple[np.ndarray, float, int]:
+
     """
     Python-level wrapper around _cascading_kopt_inner.
-
-    Runs ILS in `chunk_size` kick batches. If `time_limit_s > 0`, stops
-    before starting the next chunk when elapsed wall time exceeds
-    `time_limit_s * 0.97` (3% safety margin), ensuring we never go over
-    budget.
+    Supports real-time progress reporting via progress_array.
     """
+    # ... (byte alignment code)
     # Byte alignment
     coords_x = np.ascontiguousarray(coords_x, dtype=np.float64)
     coords_y = np.ascontiguousarray(coords_y, dtype=np.float64)
@@ -1176,5 +1177,9 @@ def cascading_kopt_optimize(
             stagnation_count,
         )
         kicks_done += this_chunk
+        
+        # Update shared memory
+        if progress_array is not None:
+            progress_array[seed_idx] = kicks_done
 
-    return best_tour, best_length
+    return best_tour, best_length, kicks_done

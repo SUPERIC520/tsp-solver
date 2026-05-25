@@ -5,7 +5,9 @@ import argparse
 import multiprocessing as mp
 import sys
 from typing import Tuple, Optional
-from src.utils.data_io import load_cities, save_solution_csv
+from src.utils.data_io import load_cities, save_solution_csv, load_tour
+from src.utils.persistence import update_best_tour
+from src.utils.time_utils import format_duration
 from src.core.preprocessing import (
     build_candidate_sets,
     refine_candidate_set_with_alpha,
@@ -23,15 +25,24 @@ def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
     np.save(pi_file, pi)
 
 
+def format_duration(seconds: float) -> str:
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours}h {minutes}m {secs}s"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="TSP Solver - Final Production Run")
     parser.add_argument("--kicks", type=int, default=25000, help="Number of kicks per seed")
+    parser.add_argument("--iters", type=int, default=1, help="Number of full iterations (0 for infinite)")
     parser.add_argument("--seeds", type=int, default=8, help="Total number of seeds")
     parser.add_argument("--greedy_seeds", type=int, default=4, help="Number of greedy NN seeds")
     parser.add_argument("--max_opt", type=int, default=3, help="Max k for k-opt (3 is standard successful config)")
     parser.add_argument("--n", type=int, default=0, help="Number of cities to subset (0 for all)")
     parser.add_argument("--hk_iter", type=int, default=10000, help="HK lower bound iterations")
     parser.add_argument("--no_cache", action="store_true", help="Disable using cached HK bounds")
+    parser.add_argument("--start_tour", type=str, default=None, help="Path to an existing tour file to start from")
     args = parser.parse_args()
 
     start_total = time.time()
@@ -103,43 +114,87 @@ def main() -> None:
     num_hilbert = args.seeds - args.greedy_seeds
     print(f"[Step 5] Generating {num_hilbert} Hilbert + {args.greedy_seeds} greedy-NN seeds...")
     t0 = time.time()
-    seeds_list = []
-    if num_hilbert > 0:
-        seeds_list.append(generate_hilbert_seeds(coords, num_seeds=num_hilbert))
-    if args.greedy_seeds > 0:
-        seeds_list.append(generate_greedy_nn_seeds(coords, candidate_set, num_seeds=args.greedy_seeds))
-    seeds = np.vstack(seeds_list) if len(seeds_list) > 1 else seeds_list[0]
+    
+    if args.start_tour:
+        print(f"  - Loading starting tour from {args.start_tour}...")
+        start_tour_indices, _ = load_tour(args.start_tour)
+        # Map tour to new order
+        start_tour_new = orig_to_new[start_tour_indices]
+        seeds = np.tile(start_tour_new, (args.seeds, 1))
+    else:
+        seeds_list = []
+        if num_hilbert > 0:
+            seeds_list.append(generate_hilbert_seeds(coords, num_seeds=num_hilbert))
+        if args.greedy_seeds > 0:
+            seeds_list.append(generate_greedy_nn_seeds(coords, candidate_set, num_seeds=args.greedy_seeds))
+        seeds = np.vstack(seeds_list) if len(seeds_list) > 1 else seeds_list[0]
+    
     dt = time.time() - t0
-    print(f"  - Seeds generated in {dt:.2f}s.")
+    print(f"  - Seeds generated/loaded in {dt:.2f}s.")
 
     # 4. Optimization
-    print(f"[Step 6] Parallel optimization (kicks={args.kicks}, max_opt={args.max_opt})...")
+    print(f"[Step 6] Parallel optimization (kicks={args.kicks}, max_opt={args.max_opt}, iters={args.iters})...")
     locked_edges = np.full((n, 2), -1, dtype=np.int32)
     num_processes = min(mp.cpu_count(), args.seeds)
     print(f"  - Running {args.seeds} parallel solvers on {num_processes} processes...")
 
     start_opt = time.time()
     
-    results = parallel_solve(
-        seeds, 
-        coords, 
-        candidate_set, 
-        locked_edges, 
-        num_processes=num_processes,
-        num_kicks=args.kicks,
-        max_opt=args.max_opt
-    )
-    
+    global_best_tour_new = None
+    global_best_length = np.inf
+
+    current_iter = 0
+    while args.iters == 0 or current_iter < args.iters:
+        current_iter += 1
+        iter_start = time.time()
+        print(f"\n  [Iteration {current_iter}/{args.iters if args.iters > 0 else '∞'}]")
+
+        results = parallel_solve(
+            seeds, 
+            coords, 
+            candidate_set, 
+            locked_edges, 
+            num_processes=num_processes,
+            num_kicks=args.kicks,
+            max_opt=args.max_opt,
+            iteration_start_time=iter_start,
+            total_start_time=start_opt
+        )
+        
+        # Track iteration best
+        iter_best_tour = None
+        iter_best_length = np.inf
+        for tour, length in results:
+            if length < iter_best_length:
+                iter_best_length = length
+                iter_best_tour = tour.copy()
+        
+        iter_duration = time.time() - iter_start
+        total_elapsed = time.time() - start_opt
+        print(f"  - Iteration duration: {format_duration(iter_duration)}")
+        print(f"  - Total elapsed: {format_duration(total_elapsed)}")
+        
+        if iter_best_length < global_best_length:
+            global_best_length = iter_best_length
+            global_best_tour_new = iter_best_tour.copy()
+            seeds = np.tile(global_best_tour_new, (args.seeds, 1)) # Re-seed from best
+            print(f"  - Found new best length: {global_best_length:.2f}")
+            
+            # Save intermediate result
+            temp_best_tour = new_to_orig[global_best_tour_new]
+            save_solution_csv("data/solutions.csv", temp_best_tour, global_best_length)
+            update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
+        else:
+            print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
+            # Re-seed from original distribution to encourage diversity
+            seeds = generate_hilbert_seeds(coords, num_seeds=num_hilbert)
+            # (Appending greedy seeds for diversity if needed)
+
     dt_opt = time.time() - start_opt
     print(f"\n  - Optimization completed in {dt_opt:.2f}s.")
-
-    # Find best tour
-    best_tour_new = None
-    best_length = np.inf
-    for tour, length in results:
-        if length < best_length:
-            best_length = length
-            best_tour_new = tour.copy()
+    
+    best_tour_new = global_best_tour_new
+    best_length = global_best_length
 
     # Map best tour back to original indices
     assert best_tour_new is not None
@@ -155,7 +210,8 @@ def main() -> None:
     # 6. Save Results
     print("\n[Step 8] Saving results...")
     save_solution_csv("data/solutions.csv", best_tour, best_length)
-    print("  - Saved to data/solutions.csv")
+    update_best_tour("data/best_tour.csv", best_tour, best_length)
+    print("  - Saved to data/solutions.csv and data/best_tour.csv")
 
     total_time = time.time() - start_total
     print(f"\n[Done] Total Wall-Clock Runtime: {total_time:.2f}s ({total_time/60:.2f}m)")
