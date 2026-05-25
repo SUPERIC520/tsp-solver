@@ -177,7 +177,12 @@ def main() -> None:
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
             global_best_tour_new = iter_best_tour.copy()
-            seeds = np.tile(global_best_tour_new, (args.seeds, 1)) # Re-seed from best
+            # 50% from best, 50% from fresh Hilbert
+            num_keep = args.seeds // 2
+            seeds = np.vstack([
+                np.tile(global_best_tour_new, (num_keep, 1)),
+                generate_hilbert_seeds(coords, num_seeds=args.seeds - num_keep)
+            ])
             print(f"  - Found new best length: {global_best_length:.2f}")
             
             # Save intermediate result
@@ -186,9 +191,12 @@ def main() -> None:
             update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
         else:
             print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
-            # Re-seed from original distribution to encourage diversity
-            seeds = generate_hilbert_seeds(coords, num_seeds=num_hilbert)
-            # (Appending greedy seeds for diversity if needed)
+            # 50% from best (to keep local exploration going), 50% fresh Hilbert
+            num_keep = args.seeds // 2
+            seeds = np.vstack([
+                np.tile(global_best_tour_new, (num_keep, 1)),
+                generate_hilbert_seeds(coords, num_seeds=args.seeds - num_keep)
+            ])
 
     dt_opt = time.time() - start_opt
     print(f"\n  - Optimization completed in {dt_opt:.2f}s.")
