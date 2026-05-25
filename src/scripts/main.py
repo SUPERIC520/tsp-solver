@@ -54,6 +54,10 @@ def main() -> None:
     if args.n > 0:
         coords_orig = coords_orig[:args.n]
     n = coords_orig.shape[0]
+    
+    # Check if we are running on full data for persistence
+    is_full_run = (args.n == 0 or args.n == coords_orig.shape[0])
+    
     dt = time.time() - t0
     print(f"  - Loaded {n} cities in {dt:.2f}s.")
 
@@ -188,7 +192,8 @@ def main() -> None:
             # Save intermediate result
             temp_best_tour = new_to_orig[global_best_tour_new]
             save_solution_csv("data/solutions.csv", temp_best_tour, global_best_length)
-            update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
+            if is_full_run:
+                update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
         else:
             print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
             # 50% from best (to keep local exploration going), 50% fresh Hilbert
@@ -218,8 +223,11 @@ def main() -> None:
     # 6. Save Results
     print("\n[Step 8] Saving results...")
     save_solution_csv("data/solutions.csv", best_tour, best_length)
-    update_best_tour("data/best_tour.csv", best_tour, best_length)
-    print("  - Saved to data/solutions.csv and data/best_tour.csv")
+    if is_full_run:
+        update_best_tour("data/best_tour.csv", best_tour, best_length)
+        print("  - Saved to data/solutions.csv and data/best_tour.csv")
+    else:
+        print("  - Saved to data/solutions.csv (Persistence skipped: not a full run)")
 
     total_time = time.time() - start_total
     print(f"\n[Done] Total Wall-Clock Runtime: {total_time:.2f}s ({total_time/60:.2f}m)")
