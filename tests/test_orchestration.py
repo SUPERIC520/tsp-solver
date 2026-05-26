@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from src.core.orchestration import parallel_solve
 
 
@@ -12,7 +13,7 @@ def test_parallel_solve_basic() -> None:
     for i in range(n):
         candidate_set[i, :4] = np.random.choice(n, 4, replace=False)
 
-    locked_edges = np.full((n, 2), -1, dtype=np.int32)
+    np.full((n, 2), -1, dtype=np.int32)
 
     results = parallel_solve(
         seeds, coords, candidate_set, num_processes=2
@@ -63,7 +64,7 @@ def test_parallel_solve_scaling() -> None:
     assert len(res_4) == 3
 
 
-def test_parallel_solve_progress_reporting(capsys) -> None:
+def test_parallel_solve_progress_reporting(capsys: pytest.CaptureFixture) -> None:
     # Verify that status logs and progress are printed during execution
     n = 20
     coords = np.random.rand(n, 2).astype(np.float64)

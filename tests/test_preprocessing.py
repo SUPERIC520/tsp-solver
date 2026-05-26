@@ -9,7 +9,6 @@ Covers:
 """
 
 import numpy as np
-import pytest
 
 from src.core.preprocessing import (
     build_candidate_sets,

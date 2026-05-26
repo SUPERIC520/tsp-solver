@@ -36,7 +36,7 @@ def _kopt_worker(
             progress_array=_shared_progress_array,
             seed_idx=seed_idx,
         )
-        return res  # type: ignore[no-any-return]
+        return res
     except Exception as e:
         return e
 

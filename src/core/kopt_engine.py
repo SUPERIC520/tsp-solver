@@ -3,6 +3,8 @@ import time
 from typing import Any, Tuple
 from numba import njit, prange
 
+from src.config import K_NEIGHBORS, K_3OPT, K_4OPT, K_5OPT, OR_OPT_MAX_LEN
+
 
 def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
     """
@@ -87,7 +89,6 @@ def _optimize_2opt(
         return False
     globally_improved = False
     
-    K_NEIGHBORS = 40
     num_cand = min(candidate_set.shape[1], K_NEIGHBORS)
 
     for u_idx in range(n):
@@ -255,8 +256,6 @@ def _optimize_3opt_sequential(
         return False
     globally_improved = False
     
-    K_NEIGHBORS = 40
-    K_3OPT = 15
     num_cand_k3 = min(candidate_set.shape[1], K_NEIGHBORS)
     num_cand_k5 = min(candidate_set.shape[1], K_3OPT)
 
@@ -585,9 +584,6 @@ def _optimize_4opt_sequential(
         return False
     globally_improved = False
     
-    K_NEIGHBORS = 40
-    K_3OPT = 15
-    K_4OPT = 5
     num_cand_k3 = min(candidate_set.shape[1], K_NEIGHBORS)
     num_cand_k5 = min(candidate_set.shape[1], K_3OPT)
     num_cand_k7 = min(candidate_set.shape[1], K_4OPT)
@@ -725,10 +721,6 @@ def _optimize_5opt_sequential(
         return False
     globally_improved = False
     
-    K_NEIGHBORS = 40
-    K_3OPT = 15
-    K_4OPT = 5
-    K_5OPT = 3
     num_cand_k3 = min(candidate_set.shape[1], K_NEIGHBORS)
     num_cand_k5 = min(candidate_set.shape[1], K_3OPT)
     num_cand_k7 = min(candidate_set.shape[1], K_4OPT)
@@ -931,7 +923,7 @@ def _full_cascade(
 
         # Or-opt search
         if _optimize_or_opt(
-            tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb, max_len=5
+            tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb, max_len=OR_OPT_MAX_LEN
         ):
             improved = True
             continue
