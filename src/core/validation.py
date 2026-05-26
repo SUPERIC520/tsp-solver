@@ -1,5 +1,5 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 from typing import Tuple
 import os
 import json
@@ -312,7 +312,7 @@ def compute_hk_lower_bound(
     return best_lb, best_pi
 
 
-@njit(cache=True, fastmath=True)  # type: ignore
+@njit(cache=True, fastmath=True, parallel=True)  # type: ignore
 def compute_alpha_values(
     n: int, coords: np.ndarray, candidate_set: np.ndarray, pi: np.ndarray
 ) -> np.ndarray:
@@ -386,39 +386,49 @@ def compute_alpha_values(
             if up[i, j - 1] != -1:
                 up[i, j] = up[up[i, j - 1], j - 1]
                 max_edge[i, j] = max(max_edge[i, j - 1], max_edge[up[i, j - 1], j - 1])
-    alphas = np.full(candidate_set.shape, np.inf, dtype=np.float64)
-    for node_i in range(n):
-        for cand_k in range(candidate_set.shape[1]):
-            node_j = candidate_set[node_i, cand_k]
-            if node_j == -1:
+    
+    num_cands = candidate_set.shape[1]
+    alphas = np.full((n, num_cands), np.inf, dtype=np.float64)
+    
+    # We use explicit integer types to avoid Numba parallel inference issues
+    for node_i in prange(n):
+        u_idx = np.int32(node_i)
+        for cand_k in range(num_cands):
+            v_node = candidate_set[u_idx, cand_k]
+            if v_node == -1:
                 break
-            if node_i == root or node_j == root:
-                val_other = int(node_j) if node_i == root else node_i
+            
+            v_idx = np.int32(v_node)
+            if u_idx == root or v_idx == root:
+                val_other = v_idx if u_idx == root else u_idx
                 if val_other == n1 or val_other == n2:
-                    alphas[node_i, cand_k] = 0.0
+                    alphas[u_idx, cand_k] = 0.0
                 else:
-                    alphas[node_i, cand_k] = _get_dist(root, val_other, coords, pi) - d2
+                    alphas[u_idx, cand_k] = _get_dist(root, val_other, coords, pi) - d2
             else:
-                curr_u = node_i
-                curr_v = int(node_j)
+                curr_u = u_idx
+                curr_v = v_idx
                 if depth[curr_u] < depth[curr_v]:
                     curr_u, curr_v = curr_v, curr_u
-                res = -1e15
-                diff = int(depth[curr_u]) - int(depth[curr_v])
+                
+                max_e = -1e15
+                diff = depth[curr_u] - depth[curr_v]
                 for lca_step in range(log_n):
                     if (diff >> lca_step) & 1:
-                        res = max(res, max_edge[curr_u, lca_step])
-                        curr_u = int(up[curr_u, lca_step])
+                        max_e = max(max_e, max_edge[curr_u, lca_step])
+                        curr_u = up[curr_u, lca_step]
+                
                 if curr_u != curr_v:
                     for lca_step in range(log_n - 1, -1, -1):
                         if up[curr_u, lca_step] != up[curr_v, lca_step]:
-                            res = max(res, max_edge[curr_u, lca_step])
-                            res = max(res, max_edge[curr_v, lca_step])
-                            curr_u = int(up[curr_u, lca_step])
-                            curr_v = int(up[curr_v, lca_step])
-                    res = max(res, max_edge[curr_u, 0])
-                    res = max(res, max_edge[curr_v, 0])
-                alphas[node_i, cand_k] = _get_dist(node_i, int(node_j), coords, pi) - res
+                            max_e = max(max_e, max_edge[curr_u, lca_step])
+                            max_e = max(max_e, max_edge[curr_v, lca_step])
+                            curr_u = up[curr_u, lca_step]
+                            curr_v = up[curr_v, lca_step]
+                    max_e = max(max_e, max_edge[curr_u, 0])
+                    max_e = max(max_e, max_edge[curr_v, 0])
+                
+                alphas[u_idx, cand_k] = _get_dist(u_idx, v_idx, coords, pi) - max_e
     return alphas
 
 
