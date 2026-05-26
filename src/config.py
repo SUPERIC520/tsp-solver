@@ -2,9 +2,21 @@
 Global configuration constants for the TSP solver.
 """
 
+import os
+
+def _get_cache_version() -> str:
+    try:
+        with open('.git/HEAD', 'r') as f:
+            ref = f.read().strip()
+            if ref.startswith('ref: '):
+                branch = ref.split('refs/heads/')[-1]
+                return branch.replace('/', '_')
+            return ref[:7]
+    except Exception:
+        return 'default'
+
 # Cache version for generated artifacts (e.g. .npy bounds).
-# Bump this when changing caching logic or file formats to avoid branch conflicts.
-CACHE_VERSION: str = "v1"
+CACHE_VERSION: str = _get_cache_version()
 
 # Initial KD-Tree neighbor query count
 KD_TREE_QUERY_SIZE: int = 64

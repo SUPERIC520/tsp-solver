@@ -20,8 +20,9 @@ from src.core.validation import compute_hk_lower_bound, validate_result
 from src.config import CACHE_VERSION
 
 def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
-    hk_file = f"data/sample_{n}_hk_{CACHE_VERSION}.npy"
-    pi_file = f"data/sample_{n}_pi_{CACHE_VERSION}.npy"
+    hk_file = f"data/cache/{CACHE_VERSION}/sample_{n}_hk.npy"
+    pi_file = f"data/cache/{CACHE_VERSION}/sample_{n}_pi.npy"
+    os.makedirs(os.path.dirname(hk_file), exist_ok=True)
     np.save(hk_file, np.array([hk]))
     np.save(pi_file, pi)
 
@@ -78,8 +79,8 @@ def main() -> None:
     
     # Try loading cache by default
     if not args.no_cache:
-        hk_npy = f"data/sample_{n}_hk_{CACHE_VERSION}.npy"
-        pi_npy = f"data/sample_{n}_pi_{CACHE_VERSION}.npy"
+        hk_npy = f"data/cache/{CACHE_VERSION}/sample_{n}_hk.npy"
+        pi_npy = f"data/cache/{CACHE_VERSION}/sample_{n}_pi.npy"
         if os.path.exists(hk_npy) and os.path.exists(pi_npy):
             lb_val = float(np.load(hk_npy)[0])
             pi_orig = np.load(pi_npy)

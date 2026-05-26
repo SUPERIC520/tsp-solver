@@ -24,6 +24,7 @@ logs/
 *.log
 
 # Data artifacts — ignore generated files, keep source data
+data/cache/
 data/*.npy
 data/solutions.csv
 data/best_tour.csv
