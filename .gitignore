@@ -7,4 +7,15 @@ wheels/
 *.egg-info
 
 # Virtual environments
-.venv
+# Cache and temporary folders
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.antigravitycli/
+# Cache and temporary folders
+.cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.antigravitycli/
