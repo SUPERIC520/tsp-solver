@@ -26,16 +26,16 @@ This document tracks the overall refactoring progress. Each module contains a ch
 
 - [ ] **K-Opt Engine Module** (Details: [kopt-engine.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/kopt-engine.md))
   - [x] [T4.1] Delete `locked_edges` parameters from K-opt engine completely.
-  - [ ] [T4.2] Optimize distance precomputations with JIT-parallel SIMD directives.
-  - [ ] [T4.3] Refine `_optimize_2opt` using C-contiguous aligned arrays and DLB.
-  - [ ] [T4.4] Implement `_optimize_or_opt` relocate swaps.
-  - [ ] [T4.5] Refine `_optimize_3opt_sequential` implementing dynamic funneling (`K_3OPT`) and gain pruning.
-  - [ ] [T4.6] Refine `_optimize_4opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`).
-  - [ ] [T4.7] Refine `_optimize_5opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`, `K_5OPT`).
-  - [ ] [T4.8] Implement sequential cascade manager `_full_cascade` running up to 5-opt.
-  - [ ] [T4.9] Implement `_cascading_kopt_inner` ILS JIT chunk kick loops.
-  - [ ] [T4.10] Implement Python wrapper `cascading_kopt_optimize` asserting 64-byte alignments and return precise kick counts.
-  - [ ] [T4.11] Implement local search operators correctness unit tests.
+  - [x] [T4.2] Optimize distance precomputations with JIT-parallel SIMD directives.
+  - [x] [T4.3] Refine `_optimize_2opt` using C-contiguous aligned arrays and DLB.
+  - [x] [T4.4] Implement `_optimize_or_opt` relocate swaps.
+  - [x] [T4.5] Refine `_optimize_3opt_sequential` implementing dynamic funneling (`K_3OPT`) and gain pruning.
+  - [x] [T4.6] Refine `_optimize_4opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`).
+  - [x] [T4.7] Refine `_optimize_5opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`, `K_5OPT`).
+  - [x] [T4.8] Implement sequential cascade manager `_full_cascade` running up to 5-opt.
+  - [x] [T4.9] Implement `_cascading_kopt_inner` ILS JIT chunk kick loops.
+  - [x] [T4.10] Implement Python wrapper `cascading_kopt_optimize` asserting 64-byte alignments and return precise kick counts.
+  - [x] [T4.11] Implement local search operators correctness unit tests.
 
 - [x] **Orchestration Module** (Details: [orchestration.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/orchestration.md))
   - [x] [T5.1] Replace Manager proxy list with multiprocessing Array shared memory.
