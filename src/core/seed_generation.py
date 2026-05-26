@@ -1,109 +1,8 @@
 import numpy as np
 from numba import njit
-from typing import Any
-
-
-@njit  # type: ignore
-def _xy2d(n: int, x: int, y: int) -> int:
-    """
-    Convert (x, y) to d (distance along Hilbert curve).
-    n must be a power of 2.
-    """
-    d = 0
-    s = n // 2
-    while s > 0:
-        rx = (x & s) > 0
-        ry = (y & s) > 0
-        d += s * s * ((3 * int(rx)) ^ int(ry))
-
-        # Rotate/flip
-        if ry == 0:
-            if rx == 1:
-                x = s - 1 - x
-                y = s - 1 - y
-            x, y = y, x
-        s //= 2
-    return d
-
-
-@njit(cache=True)  # type: ignore
-def _get_hilbert_indices(
-    coords: np.ndarray[Any, np.dtype[np.float64]],
-) -> np.ndarray[Any, np.dtype[np.int32]]:
-    """
-    Sort indices based on Hilbert curve.
-    """
-    num_points = coords.shape[0]
-
-    # Normalize coordinates to [0, 2^k - 1]
-    min_x, min_y = np.inf, np.inf
-    max_x, max_y = -np.inf, -np.inf
-
-    for i in range(num_points):
-        if coords[i, 0] < min_x:
-            min_x = coords[i, 0]
-        if coords[i, 1] < min_y:
-            min_y = coords[i, 1]
-        if coords[i, 0] > max_x:
-            max_x = coords[i, 0]
-        if coords[i, 1] > max_y:
-            max_y = coords[i, 1]
-
-    range_x = max_x - min_x
-    range_y = max_y - min_y
-    max_range = max(range_x, range_y)
-
-    if max_range == 0:
-        return np.arange(num_points, dtype=np.int32)
-
-    # Choose n as a power of 2 large enough for precision
-    # For 115k cities, 2^20 is more than enough
-    n = 2**20
-
-    hilbert_distances = np.empty(num_points, dtype=np.int64)
-    for i in range(num_points):
-        ix = int((coords[i, 0] - min_x) / max_range * (n - 1))
-        iy = int((coords[i, 1] - min_y) / max_range * (n - 1))
-        hilbert_distances[i] = _xy2d(n, ix, iy)
-
-    return np.argsort(hilbert_distances).astype(np.int32)
-
-
-def generate_hilbert_seeds(
-    coords: np.ndarray[Any, np.dtype[np.float64]], num_seeds: int = 8
-) -> np.ndarray[Any, np.dtype[np.int32]]:
-    """
-    Generate diverse initial tours using rotated/reflected Hilbert curves.
-    Ensures maximum diversity by applying all 8 symmetries of the square.
-    """
-    n = coords.shape[0]
-    seeds = np.empty((num_seeds, n), dtype=np.int32)
-
-    # Use up to 8 Hilbert symmetries
-    num_hilbert = min(num_seeds, 8)
-
-    for i in range(num_hilbert):
-        transformed_coords = coords.copy()
-        sym = i % 8
-        if sym >= 4:
-            transformed_coords[:, 0] = -transformed_coords[:, 0]
-            sym -= 4
-
-        for _ in range(sym):
-            old_x = transformed_coords[:, 0].copy()
-            old_y = transformed_coords[:, 1].copy()
-            transformed_coords[:, 0] = -old_y
-            transformed_coords[:, 1] = old_x
-
-        seeds[i] = _get_hilbert_indices(transformed_coords)
-
-    for i in range(num_hilbert, num_seeds):
-        # If more than 8 seeds are requested, add some noise to coords for more Hilbert variants
-        transformed_coords = coords.copy()
-        transformed_coords += np.random.normal(0, 1e-6, transformed_coords.shape)
-        seeds[i] = _get_hilbert_indices(transformed_coords)
-
-    return seeds
+from typing import Tuple, cast
+import multiprocessing as mp
+from src.config import NUM_PROCESSES_SEEDING
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -159,6 +58,74 @@ def _greedy_nn_tour(
     return tour
 
 
+def _greedy_nn_worker(args: Tuple[np.ndarray, np.ndarray, int]) -> np.ndarray:
+    """
+    Worker function for parallel greedy NN seed generation.
+    """
+    coords, candidate_set, start_node = args
+    return cast(np.ndarray, _greedy_nn_tour(coords, candidate_set, int(start_node)))
+
+
+def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
+    """
+    Ensure the numpy array is C-contiguous and its data pointer is aligned to the specified byte boundary.
+    If already aligned and contiguous, returns the array.
+    Otherwise, creates a new aligned array and copies the data.
+    """
+    arr = np.ascontiguousarray(arr)
+    if arr.size == 0:
+        return arr
+    if arr.ctypes.data % alignment == 0:
+        return arr
+
+    dtype = arr.dtype
+    shape = arr.shape
+    nbytes = arr.nbytes
+
+    raw = np.empty(nbytes + alignment, dtype=np.uint8)
+    start_address = raw.ctypes.data
+    offset = (alignment - (start_address % alignment)) % alignment
+
+    aligned_raw = raw[offset : offset + nbytes]
+    aligned_arr = aligned_raw.view(dtype).reshape(shape)
+    np.copyto(aligned_arr, arr)
+
+    assert aligned_arr.ctypes.data % alignment == 0
+    assert aligned_arr.flags['C_CONTIGUOUS']
+    return aligned_arr
+
+
+@njit(cache=True)  # type: ignore
+def _find_index_jit(arr: np.ndarray, val: int) -> int:
+    for i in range(arr.shape[0]):
+        if arr[i] == val:
+            return i
+    return -1
+
+
+@njit(cache=True)  # type: ignore
+def _rotate_tour_jit(tour: np.ndarray, start_idx: int) -> np.ndarray:
+    n = tour.shape[0]
+    out = np.empty(n, dtype=np.int32)
+    out[:n - start_idx] = tour[start_idx:]
+    out[n - start_idx:] = tour[:start_idx]
+    return out
+
+
+def rotate_tour(tour: np.ndarray, start_node: int) -> np.ndarray:
+    """
+    Rotate starting node sequence while keeping the path cycle topology unchanged.
+    Ensure the output array is C-contiguous and 64-byte aligned.
+    """
+    tour = np.ascontiguousarray(tour, dtype=np.int32)
+    start_idx = _find_index_jit(tour, start_node)
+    if start_idx == -1:
+        raise ValueError(f"start_node {start_node} not found in tour")
+
+    rotated = _rotate_tour_jit(tour, start_idx)
+    return ensure_alignment(rotated, alignment=64)
+
+
 def generate_greedy_nn_seeds(
     coords: np.ndarray,
     candidate_set: np.ndarray,
@@ -166,32 +133,50 @@ def generate_greedy_nn_seeds(
     start_nodes: np.ndarray | None = None,
 ) -> np.ndarray:
     """
-    Generate greedy nearest-neighbor seeds from diverse starting cities.
-    Useful for complementing Hilbert seeds with different basin exploration.
+    Generate greedy nearest-neighbor seeds from diverse starting cities in parallel.
+    Uses multiprocessing.Pool (bounded by NUM_PROCESSES_SEEDING).
+    Returns a 64-byte aligned contiguous matrix of shape (num_seeds, N).
     """
     n = coords.shape[0]
-    seeds = np.empty((num_seeds, n), dtype=np.int32)
+
+    if num_seeds <= 0:
+        res = np.empty((0, n), dtype=np.int32)
+        return ensure_alignment(res, alignment=64)
 
     if start_nodes is None:
         # Space starting nodes evenly across the tour
         step = max(1, n // num_seeds)
         start_nodes = np.array([i * step for i in range(num_seeds)], dtype=np.int32)
+    else:
+        if start_nodes.shape[0] != num_seeds:
+            raise ValueError(f"start_nodes length {start_nodes.shape[0]} does not match num_seeds {num_seeds}")
 
-    for i in range(num_seeds):
-        seeds[i] = _greedy_nn_tour(coords, candidate_set, int(start_nodes[i]))
+    # Determine process count
+    num_procs = NUM_PROCESSES_SEEDING
+    if num_procs <= 0:
+        num_procs = mp.cpu_count()
+    num_procs = min(num_procs, num_seeds)
 
-    return seeds
+    # Ensure inputs are C-contiguous and correctly typed
+    coords = np.ascontiguousarray(coords, dtype=np.float64)
+    candidate_set = np.ascontiguousarray(candidate_set, dtype=np.int32)
+    start_nodes = np.ascontiguousarray(start_nodes, dtype=np.int32)
 
+    # Prepare tasks
+    tasks = [(coords, candidate_set, int(start_nodes[i])) for i in range(num_seeds)]
 
-def generate_random_seeds(
-    n: int, num_seeds: int = 1
-) -> np.ndarray:
-    """
-    Generate random permutation seeds.
-    Used to benchmark more structured seeding strategies.
-    """
+    # Run in parallel pool
+    if num_procs > 1:
+        with mp.Pool(processes=num_procs) as pool:
+            tours = pool.map(_greedy_nn_worker, tasks)
+    else:
+        # Fallback to serial execution if only 1 process is used
+        tours = [_greedy_nn_worker(task) for task in tasks]
+
+    # Convert list of tours to a 2D numpy array
     seeds = np.empty((num_seeds, n), dtype=np.int32)
-    base = np.arange(n, dtype=np.int32)
     for i in range(num_seeds):
-        seeds[i] = np.random.permutation(base)
-    return seeds
+        seeds[i] = tours[i]
+
+    # Ensure the returned matrix is 64-byte aligned and contiguous
+    return ensure_alignment(seeds, alignment=64)

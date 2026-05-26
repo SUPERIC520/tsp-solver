@@ -18,11 +18,11 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [ ] [T2.5] Refine `refine_candidate_set_with_alpha` with C-contiguity and alignment.
   - [ ] [T2.6] Implement preprocessing correctness unit tests.
 
-- [ ] **Seed Generation & Rotation Module** (Details: [seed-generation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/seed-generation.md))
-  - [ ] [T3.1] Remove Hilbert and Random seeds standalone methods.
-  - [ ] [T3.2] Implement path cycle rotation function `rotate_tour`.
-  - [ ] [T3.3] Implement parallel Greedy NN seeding using `multiprocessing.Pool`.
-  - [ ] [T3.4] Implement seed generation unit tests.
+- [x] **Seed Generation & Rotation Module** (Details: [seed-generation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/seed-generation.md))
+  - [x] [T3.1] Remove Hilbert and Random seeds standalone methods.
+  - [x] [T3.2] Implement path cycle rotation function `rotate_tour`.
+  - [x] [T3.3] Implement parallel Greedy NN seeding using `multiprocessing.Pool`.
+  - [x] [T3.4] Implement seed generation unit tests.
 
 - [ ] **K-Opt Engine Module** (Details: [kopt-engine.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/kopt-engine.md))
   - [ ] [T4.1] Delete `locked_edges` parameters from K-opt engine completely.
@@ -37,11 +37,11 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [ ] [T4.10] Implement Python wrapper `cascading_kopt_optimize` asserting 64-byte alignments and return precise kick counts.
   - [ ] [T4.11] Implement local search operators correctness unit tests.
 
-- [ ] **Orchestration Module** (Details: [orchestration.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/orchestration.md))
-  - [ ] [T5.1] Replace Manager proxy list with multiprocessing Array shared memory.
-  - [ ] [T5.2] Setup worker allocations under `NUM_PROCESSES_SOLVER`.
-  - [ ] [T5.3] Implement pool managers catching worker JIT errors and time budgets.
-  - [ ] [T5.4] Implement orchestration unit tests.
+- [x] **Orchestration Module** (Details: [orchestration.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/orchestration.md))
+  - [x] [T5.1] Replace Manager proxy list with multiprocessing Array shared memory.
+  - [x] [T5.2] Setup worker allocations under `NUM_PROCESSES_SOLVER`.
+  - [x] [T5.3] Implement pool managers catching worker JIT errors and time budgets.
+  - [x] [T5.4] Implement orchestration unit tests.
 
 - [ ] **Validation & Held-Karp Module** (Details: [validation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/validation.md))
   - [ ] [T6.1] Clean up `locked_edges` parameters from validation subroutines.
