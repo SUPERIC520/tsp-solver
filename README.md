@@ -51,25 +51,37 @@ This specific relaxation is evaluated algorithmically because the problem of fin
 
 ## 2. Initialization and Seeding Strategies
 
-### Greedy Nearest Neighbor Initialization
-The implementation executes the Greedy Nearest Neighbor algorithm. The process utilizes a distance matrix $D$ mapping elements $D_{i,j}$ to the Euclidean distance between vertex $v_i$ and vertex $v_j$. The initialization selects vertex $v_0$, then sequentially appends vertex $v_j$ to set $V_{\text{visited}}$ where $D_{i,j} = \min(D_{i,x} \mid v_x \notin V_{\text{visited}})$. The loop executes $N-1$ times. The algorithm performs $O(N^2)$ distance computations. The implementation logic relies on archival ANOVA documentation recording $p < 2.07 \times 10^{-85}$. This $p$-value rejects the null hypothesis for equivalence between the Greedy Nearest Neighbor algorithm and stochastic vertex sequencing.
+### 2.1 Greedy Nearest Neighbor Setup
 
-### Continuation Seeding
-The solver applies a 100% exploitation strategy. At iteration $t+1$, the algorithm copies 100% of the vertices from the iteration $t$ output sequence into the iteration $t+1$ input sequence. The operation applies 0 modifications to the index sequence. Archival ANOVA data records $p < 2.74 \times 10^{-19}$ for this 100% exploitation mechanism. This statistic dictates the parameterization by rejecting hypotheses for fractional exploration ratios.
+The algorithm applies the Greedy Nearest Neighbor setup for initialization. The data in `doc/archive_notes.md` records an 800-trial experiment with parameters N=5000 and max_opt=5. The metrics from this experiment are:
 
-### Uniform Index Rotation
-The generation function computes a parameter for the vertex starting index. The application implements the mathematical function:
+*   100% Greedy Nearest Neighbor yielded a 5.71% Gap.
+*   100% Hilbert yielded a 6.70% Gap.
+*   The ANOVA test resulted in p < 2.07 x 10^-85.
+
+The Greedy Nearest Neighbor algorithm was chosen based on these gap metrics. Algorithmically, Greedy Nearest Neighbor provides a different search basin than space-filling curves.
+
+### 2.2 Continuation Seeding Setup
+
+A trial testing re-seeding via 100% Exploitation yielded a 5.52% Gap, with an ANOVA p < 2.74 x 10^-19. 
+
+Based on this 5.52% Gap result, the algorithm enforces 100% resets to the global minimum-distance tour for all cores. The algorithm enforces this reset rule so that every processing unit starts its search sequence from the exact vertex coordinates that produced the global minimum distance, eliminating iterations on coordinates with higher distance values.
+
+### 2.3 Uniform Index Rotation
+
+The algorithm maps seed index `i` to starting vertices using Uniform Index Rotation math. The equation is:
 
 ```python
 shift = (i * n) // num_seeds
 ```
 
-Variables:
-*   `i`: Iteration index variable ($0 \le i < \text{num\_seeds}$).
-*   `n`: Vertex count variable.
-*   `num_seeds`: Seed count variable.
+The variables are defined as:
+*   `shift`: The integer offset applied to the vertex array.
+*   `i`: The seed index.
+*   `n`: The vertex count.
+*   `num_seeds`: The seed count.
 
-The mathematical function separates starting indices by integer intervals. The interval equals $n / \text{num\_seeds}$. The `//` operator executes floor division, outputting integer parameters for array indexing. The algorithm offsets the zero-index by `shift` array positions. This logic distributes starting vertices across the domain $[0, n-1]$.
+This integer division spaces the starting vertices at intervals of `n // num_seeds` across the vertices to spread search origins.
 
 ## 3. Iterated Local Search (ILS) Core Engine
 
