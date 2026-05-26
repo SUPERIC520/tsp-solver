@@ -16,7 +16,7 @@ We need to resolve the freezing issue in the sequential K-Opt engine, optimize H
 
 We will fix the bug in the 3-opt sequential logic and prevent any potential infinite loops by verifying actual gain using exact path reconstruction.
 
-#### [MODIFY] [kopt_engine.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/kopt_engine.py)
+#### [MODIFY] [kopt_engine.py](src/core/kopt_engine.py)
 
 - **`_reconstruct_tour_3opt` [NEW]**: A helper function to build the new tour for all 8 3-opt segment reconnections.
 - **`_optimize_3opt_sequential`**: Re-implement to search the candidate set, evaluate the cost of each reconnection, and apply the best improving 3-opt move only if the actual cost decreases.
@@ -26,7 +26,7 @@ We will fix the bug in the 3-opt sequential logic and prevent any potential infi
 
 ### Validation & Caching
 
-#### [MODIFY] [validation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/validation.py)
+#### [MODIFY] [validation.py](src/core/validation.py)
 
 - Ensure Held-Karp bounds and Pi vectors are loaded from and saved to cache files when using `compute_hk_lower_bound`.
 

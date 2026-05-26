@@ -33,26 +33,26 @@ graph TD
 
 ### 2.1 Component Overview
 
-1.  **Configuration Hub**: [config.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/config.py)
+1.  **Configuration Hub**: [config.py](src/config.py)
     *   Holds all hyperparameters as module-level constants.
     *   Treating them as constants allows Numba to perform compile-time optimizations (dead branch elimination, loop unrolling, and inlining), yielding the fastest execution speed.
-2.  **Preprocessing & Soft Backbone**: [preprocessing.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/preprocessing.py) & [validation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/validation.py)
+2.  **Preprocessing & Soft Backbone**: [preprocessing.py](src/core/preprocessing.py) & [validation.py](src/core/validation.py)
     *   *Hilbert Reordering*: Sorts city coordinates along the space-filling Hilbert curve to group physically close cities in memory, maximizing CPU cache locality.
     *   *KD-Tree Querying*: Constructs candidate neighbor matrices (e.g., $K=64$) using `scipy.spatial.KDTree` in Python, bypassing slow triangulation methods.
     *   *Held-Karp Vector*: Computes the lower bound and the subgradient penalty vector `pi` (1D array) via JIT-accelerated 1-tree relaxation.
     *   *Alpha Refinement*: Evaluates LKH-style edge Alpha values using `pi` and coordinates. Candidate lists are sorted by Alpha values (representing the **Soft Backbone**), prioritizing promising edges for local search.
-3.  **Seeding & Reseed**: [seed_generation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/seed_generation.py)
+3.  **Seeding & Reseed**: [seed_generation.py](src/core/seed_generation.py)
     *   *Greedy Seeding*: Generates high-quality candidate-guided Nearest Neighbor tours.
     *   *Reseed Rotation*: Implements a 100% Exploit strategy where subsequent runs are seeded by evenly spaced rotated versions of the current global best tour.
-4.  **Cascading K-opt Engine**: [kopt_engine.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/kopt_engine.py)
+4.  **Cascading K-opt Engine**: [kopt_engine.py](src/core/kopt_engine.py)
     *   *Strict Cascade*: Sequentially executes **2-opt $\rightarrow$ Or-opt $\rightarrow$ 3-opt** local searches. Operators 4-opt and 5-opt are removed.
     *   *DLB Pruning*: Employs Don't Look Bits to skip unmodified nodes.
     *   *No Hard Locking*: The `locked_edges` array and hard-lock edge constraints are **deprecated and removed** from local search operators, avoiding the worst-case $O(N \cdot k^2)$ proof-of-optimality bottleneck.
-5.  **Parallel Orchestrator**: [orchestration.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/orchestration.py)
+5.  **Parallel Orchestrator**: [orchestration.py](src/core/orchestration.py)
     *   Uses `multiprocessing.Pool` to run solver seeds in parallel across CPU cores.
     *   Aggregates progress via shared-memory structures (`multiprocessing.Manager`).
     *   Includes wrapper `try-except` blocks inside workers to catch Numba/Python exceptions, preventing subprocess hang-ups.
-6.  **I/O & Persistence**: [data_io.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/utils/data_io.py) & [persistence.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/utils/persistence.py)
+6.  **I/O & Persistence**: [data_io.py](src/utils/data_io.py) & [persistence.py](src/utils/persistence.py)
     *   Handles loading of city data and caching of Held-Karp bounds.
     *   *Partial-Run Persistence Safeguard*: Ensures `data/best_tour.csv` is updated **only** during full-scale runs (when the entire dataset is solved), avoiding overwriting the optimal global tour with a subset solution.
 

@@ -1,6 +1,6 @@
 # Detailed Design: Pure Python/Numba TSP Solver
 
-This document describes the detailed design for the 100% pure Python and Numba-accelerated TSP (Traveling Salesperson Problem) core solver. It is derived from [proposal.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/proposal.md) and [high-level-design.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/high-level-design.md).
+This document describes the detailed design for the 100% pure Python and Numba-accelerated TSP (Traveling Salesperson Problem) core solver. It is derived from [proposal.md](doc/proposal.md) and [high-level-design.md](doc/high-level-design.md).
 
 ---
 

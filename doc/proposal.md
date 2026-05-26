@@ -50,25 +50,25 @@
 ## 4. 任务拆解与后续步骤 (Tasks & Next Steps)
 
 ### 第一阶段：配置抽离与环境清理
-1. **[NEW] 创建 [config.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/config.py)**：
+1. **[NEW] 创建 [config.py](src/config.py)**：
    - 提取参数：候选集大小 `K_NEIGHBORS` (默认 16)、级联最大阶段、Or-opt 的最大插入长度 `OR_OPT_MAX_LEN` (默认 5)、软骨架判定阈值 `BACKBONE_THRESHOLD` (默认 0.95)、多进程核心数 `NUM_PROCESSES` 等。
 2. **清理冗余文件**：
    - 删除 `src/core/lkh_core.py` 等实验性替代引擎。
    - 删除大文件基准测试代码（例如 `run_benchmarks.py`）。
 
 ### 第二阶段：预处理与种子生成模块重构
-3. **重构 [preprocessing.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/preprocessing.py)**：
+3. **重构 [preprocessing.py](src/core/preprocessing.py)**：
    - 删除 `_filter_nearest_neighbors` 中所有涉及 Delaunay 邻居的代码，重写为纯 KD-Tree 查询。
    - 确保 `refine_candidate_set_with_alpha` 的接口清晰，仅依据 Held-Karp 的 Alpha 值重新调整 KD-Tree 候选集内元素的顺序。
-4. **重构 [seed_generation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/seed_generation.py)**：
+4. **重构 [seed_generation.py](src/core/seed_generation.py)**：
    - 保留 `generate_greedy_nn_seeds` 作为唯一的初始种子生成器。
    - 新增路径旋转 `rotate_tour(tour, start_node)` 辅助函数，确保可以将最优路径的任一起点旋转到数组首位，完成 Exploit 策略下的重播种。
 
 ### 第三阶段：核心引擎与调度重构
-5. **重构 [kopt_engine.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/kopt_engine.py)**：
+5. **重构 [kopt_engine.py](src/core/kopt_engine.py)**：
    - 清理不符合级联顺序的代码。在 `_full_cascade` 中，只按照 `2-opt` -> `or-opt` -> `3-opt` 的级联方式顺序执行。
    - 将 Hardcoded 参数（如 Or-opt 搜索长度、Stagnation Limit 等）替换为从 `src.config` 中导入。
-6. **重构 [orchestration.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/orchestration.py)**：
+6. **重构 [orchestration.py](src/core/orchestration.py)**：
    - 保持多进程调度，并在 worker 级加入完善的异常捕获与日志记录，确保任何 Numba 异常或意外错误不会使主进程死锁。
 
 ### 第四阶段：测试整合与验证
