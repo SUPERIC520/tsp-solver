@@ -26,3 +26,6 @@ wheels/
 # Log files
 logs/
 *.log
+
+# Data artifacts
+data/

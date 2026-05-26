@@ -18,7 +18,7 @@ K_4OPT: int = 32
 K_5OPT: int = 16
 
 # Maximum segment length for Or-opt relocations
-OR_OPT_MAX_LEN: int = 5
+OR_OPT_MAX_LEN: int = 8
 
 # Maximum local search cascade depth level
 MAX_OPT: int = 5

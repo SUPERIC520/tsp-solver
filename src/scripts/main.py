@@ -3,6 +3,7 @@ import numpy as np
 import os
 import argparse
 import multiprocessing as mp
+from src.config import K_NEIGHBORS, KD_TREE_QUERY_SIZE
 from src.utils.data_io import load_cities, save_solution_csv, load_tour
 from src.utils.persistence import update_best_tour
 from src.utils.time_utils import format_duration
@@ -63,7 +64,7 @@ def main() -> None:
     # 2. Preprocessing
     print("[Step 2] Building initial candidate sets (k=64)...")
     t0 = time.time()
-    candidate_set = build_candidate_sets(coords, k=64)
+    candidate_set = build_candidate_sets(coords, k=KD_TREE_QUERY_SIZE)
     dt = time.time() - t0
     print(f"  - Initial preprocessing done in {dt:.2f}s.")
 
@@ -100,10 +101,11 @@ def main() -> None:
     print("[Step 4] Refining candidate sets with Alpha-values...")
     t0 = time.time()
     assert pi is not None
+    assert K_NEIGHBORS <= KD_TREE_QUERY_SIZE, "K_NEIGHBORS must be <= KD_TREE_QUERY_SIZE for proper refinement"
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
-    candidate_set = candidate_set[:, :40]
+    candidate_set = candidate_set[:, :K_NEIGHBORS]
     dt = time.time() - t0
-    print(f"  - Refinement to top 40 done in {dt:.2f}s.")
+    print(f"  - Refinement to top {K_NEIGHBORS} done in {dt:.2f}s.")
 
     # 3. Seed Generation
     print(f"[Step 5] Generating {args.seeds} seeds...")
@@ -142,7 +144,7 @@ def main() -> None:
     while args.iters == 0 or current_iter < args.iters:
         current_iter += 1
         iter_start = time.time()
-        print(f"\n  [Iteration {current_iter}/{args.iters if args.iters > 0 else '∞'}]")
+        print(f"\n  [Iteration {current_iter}/{args.iters if args.iters > 0 else 'inf'}]")
 
         results = parallel_solve(
             seeds,
