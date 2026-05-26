@@ -1,10 +1,59 @@
 import numpy as np
 from numba import njit
 from typing import Tuple
+import os
+import json
 from src.utils.data_io import load_hk_cache, save_hk_cache
 
+# Project root is two levels up from src/core/validation.py
+_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CACHE_PATH = os.path.join(_root, ".cache", "hk_bounds.json")
 
-@njit(cache=True)  # type: ignore
+
+def load_hk_cache_json(n: int) -> Tuple[float, np.ndarray] | None:
+    if not os.path.exists(CACHE_PATH):
+        return None
+    try:
+        with open(CACHE_PATH, "r") as f:
+            data = json.load(f)
+        key = str(n)
+        if key in data:
+            entry = data[key]
+            # Support both old "lower_bound" key and new canonical "lb" key
+            lb_val = entry.get("lb", entry.get("lower_bound"))
+            if lb_val is None:
+                return None
+            lb = float(lb_val)
+            pi = np.array(entry["pi"], dtype=np.float64)
+            return lb, pi
+    except Exception:
+        pass
+    return None
+
+
+def save_hk_cache_json(n: int, lb: float, pi: np.ndarray) -> None:
+    data = {}
+    if os.path.exists(CACHE_PATH):
+        try:
+            with open(CACHE_PATH, "r") as f:
+                data = json.load(f)
+        except Exception:
+            pass
+    
+    data[str(n)] = {
+        "lb": lb,
+        "pi": pi.tolist()
+    }
+    
+    try:
+        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+        with open(CACHE_PATH, "w") as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
+@njit(cache=True, fastmath=True)  # type: ignore
 def _get_dist(i: int, j: int, coords: np.ndarray, pi: np.ndarray) -> float:
     """
     Get transformed distance: d'(i,j) = d(i,j) + pi[i] + pi[j]
@@ -14,7 +63,7 @@ def _get_dist(i: int, j: int, coords: np.ndarray, pi: np.ndarray) -> float:
     return float(np.sqrt(dx * dx + dy * dy) + pi[i] + pi[j])
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True)  # type: ignore
 def _heap_push(
     heap_val: np.ndarray, heap_node: np.ndarray, size: int, d: float, node: int
 ) -> int:
@@ -33,7 +82,7 @@ def _heap_push(
     return size
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True)  # type: ignore
 def _heap_pop(
     heap_val: np.ndarray, heap_node: np.ndarray, size: int
 ) -> Tuple[float, int, int]:
@@ -64,7 +113,7 @@ def _heap_pop(
     return res_d, res_node, size
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True)  # type: ignore
 def _build_undirected_adj(
     n: int, candidate_set: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -96,7 +145,7 @@ def _build_undirected_adj(
     return adj_ptr, adj_indices
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True)  # type: ignore
 def compute_mst_weight(
     n: int,
     coords: np.ndarray,
@@ -147,19 +196,18 @@ def compute_mst_weight(
     return total_weight, degrees, parent
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True, parallel=True)  # type: ignore
 def _compute_hk_impl(
     coords: np.ndarray,
     candidate_set: np.ndarray,
     max_iter: int,
-    initial_pi: np.ndarray | None,
+    initial_pi: np.ndarray,
     target_ub: float,
 ) -> Tuple[float, np.ndarray]:
     n = coords.shape[0]
-    if initial_pi is not None:
-        pi = initial_pi.copy()
-    else:
-        pi = np.zeros(n, dtype=np.float64)
+    coords = np.ascontiguousarray(coords)
+    candidate_set = np.ascontiguousarray(candidate_set)
+    pi = np.ascontiguousarray(initial_pi).copy()
     best_lb = -np.inf
     best_pi = pi.copy()
     adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
@@ -237,22 +285,40 @@ def compute_hk_lower_bound(
     target_ub: float = np.inf,
     sample_name: str | None = None,
 ) -> Tuple[float, np.ndarray]:
+    n = coords.shape[0]
+    cached_json = load_hk_cache_json(n)
+    if cached_json is not None:
+        return cached_json
+
     if sample_name:
         cached = load_hk_cache(sample_name)
         if cached:
+            save_hk_cache_json(n, cached[0], cached[1])
             return cached
+
+    if initial_pi is None:
+        init_pi = np.zeros(n, dtype=np.float64)
+    else:
+        init_pi = np.ascontiguousarray(initial_pi, dtype=np.float64)
+
     best_lb, best_pi = _compute_hk_impl(
-        coords, candidate_set, max_iter, initial_pi, target_ub
+        coords, candidate_set, max_iter, init_pi, target_ub
     )
+
+    save_hk_cache_json(n, best_lb, best_pi)
     if sample_name:
         save_hk_cache(sample_name, best_lb, best_pi)
+
     return best_lb, best_pi
 
 
-@njit(cache=True)  # type: ignore
+@njit(cache=True, fastmath=True)  # type: ignore
 def compute_alpha_values(
     n: int, coords: np.ndarray, candidate_set: np.ndarray, pi: np.ndarray
 ) -> np.ndarray:
+    coords = np.ascontiguousarray(coords)
+    candidate_set = np.ascontiguousarray(candidate_set)
+    pi = np.ascontiguousarray(pi)
     adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
     root = 0
     mst_weight, degrees, parent = compute_mst_weight(
@@ -321,37 +387,38 @@ def compute_alpha_values(
                 up[i, j] = up[up[i, j - 1], j - 1]
                 max_edge[i, j] = max(max_edge[i, j - 1], max_edge[up[i, j - 1], j - 1])
     alphas = np.full(candidate_set.shape, np.inf, dtype=np.float64)
-    for i in range(n):
-        for k in range(candidate_set.shape[1]):
-            j = candidate_set[i, k]
-            if j == -1:
+    for node_i in range(n):
+        for cand_k in range(candidate_set.shape[1]):
+            node_j = candidate_set[node_i, cand_k]
+            if node_j == -1:
                 break
-            if i == root or j == root:
-                other = j if i == root else i
-                if other == n1 or other == n2:
-                    alphas[i, k] = 0.0
+            if node_i == root or node_j == root:
+                val_other = int(node_j) if node_i == root else node_i
+                if val_other == n1 or val_other == n2:
+                    alphas[node_i, cand_k] = 0.0
                 else:
-                    alphas[i, k] = _get_dist(root, other, coords, pi) - d2
+                    alphas[node_i, cand_k] = _get_dist(root, val_other, coords, pi) - d2
             else:
-                u, v = i, j
-                if depth[u] < depth[v]:
-                    u, v = v, u
+                curr_u = node_i
+                curr_v = int(node_j)
+                if depth[curr_u] < depth[curr_v]:
+                    curr_u, curr_v = curr_v, curr_u
                 res = -1e15
-                diff = depth[u] - depth[v]
-                for step in range(log_n):
-                    if (diff >> step) & 1:
-                        res = max(res, max_edge[u, step])
-                        u = up[u, step]
-                if u != v:
-                    for step in range(log_n - 1, -1, -1):
-                        if up[u, step] != up[v, step]:
-                            res = max(res, max_edge[u, step])
-                            res = max(res, max_edge[v, step])
-                            u = up[u, step]
-                            v = up[v, step]
-                    res = max(res, max_edge[u, 0])
-                    res = max(res, max_edge[v, 0])
-                alphas[i, k] = _get_dist(i, j, coords, pi) - res
+                diff = int(depth[curr_u]) - int(depth[curr_v])
+                for lca_step in range(log_n):
+                    if (diff >> lca_step) & 1:
+                        res = max(res, max_edge[curr_u, lca_step])
+                        curr_u = int(up[curr_u, lca_step])
+                if curr_u != curr_v:
+                    for lca_step in range(log_n - 1, -1, -1):
+                        if up[curr_u, lca_step] != up[curr_v, lca_step]:
+                            res = max(res, max_edge[curr_u, lca_step])
+                            res = max(res, max_edge[curr_v, lca_step])
+                            curr_u = int(up[curr_u, lca_step])
+                            curr_v = int(up[curr_v, lca_step])
+                    res = max(res, max_edge[curr_u, 0])
+                    res = max(res, max_edge[curr_v, 0])
+                alphas[node_i, cand_k] = _get_dist(node_i, int(node_j), coords, pi) - res
     return alphas
 
 
