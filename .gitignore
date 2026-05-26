@@ -7,6 +7,7 @@ wheels/
 *.egg-info
 
 # Virtual environments
+.venv/
 # Cache and temporary folders
 .cache/
 .mypy_cache/
