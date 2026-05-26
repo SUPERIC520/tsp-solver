@@ -1,20 +1,6 @@
-# Orchestration Module Tasks
+# Orchestration Module Task List
 
-- [ ] **Task 1: Worker Wrapper**
-  - Implement `_worker(args)` that unpacks `(seed, coords, candidate_set, locked_edges)`.
-  - Ensure it returns `(optimized_tour, length)`.
-- [ ] **Task 2: Multiprocessing Pool Setup**
-  - Implement `parallel_solve` using `multiprocessing.Pool(processes=num_cores)`.
-  - Use `pool.imap_unordered` for dispatching 8 seeds.
-- [ ] **Task 3: IPC & Memory Efficiency**
-  - Use read-only NumPy arrays or shared memory for `coords` and `candidate_set`.
-  - Test memory usage with 8 workers active.
-- [ ] **Task 4: Result Aggregation**
-  - Collect all 8 results and identify the top-performing tours.
-- [ ] **Task 5: Orchestration Test (Mock)**
-  - Use a dummy worker to verify the Pool logic works and captures all 8 results.
-
-## Mandatory Rules
-- **Sub-Agent**: MUST use a specialized sub-agent for every task.
-- **Testing**: Start at N=100.
-- **Seeds**: Exactly 8 seeds max.
+- [ ] **[T5.1]** Reimplement worker concurrency in [orchestration.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/orchestration.py) using `multiprocessing.Array('i', num_seeds)` for low-overhead progress counters, eliminating the Manager proxy process.
+- [ ] **[T5.2]** Set up worker process initialization under `multiprocessing.Pool` (concurrency bounded by `NUM_PROCESSES_SOLVER`), distributing slice seeds and the progress Array. Ensure inter-process tour synchronization is disabled to prevent locks.
+- [ ] **[T5.3]** Implement a robust pool manager loop utilizing `apply_async`. Catch exceptions (Numba compiles, MemoryErrors) inside worker tasks using `try-except` blocks, and check elapsed times. In case of timeouts or exceptions, invoke `pool.terminate()`, join processes, and return the best intermediate results. *(Depends on [T5.2])*
+- [ ] **[T5.4]** Write unit tests in `tests/test_orchestration.py` verifying progress reporting accuracy, concurrent solver scaling, and child process failure recovery.

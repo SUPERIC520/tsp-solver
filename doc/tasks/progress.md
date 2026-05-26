@@ -1,38 +1,59 @@
-# Project Progress Tracker
+# TSP Solver Refactoring Progress
 
-## Core Modules Status
-- [x] **Data I/O Module**: 100%
-- [x] **Preprocessing Module**: 100% (Delaunay + Numba-accelerated top 16)
-- [x] **Seed Generation Module**: 100% (Hilbert Curves, 8 Seeds)
-- [x] **Full Cascading K-Opt Engine**: 100% (Implementation and N=100 verification done)
-- [x] Orchestration Module**: 100%
-- [x] **Backbone Consensus Module**: 100%
-- [x] **Validation Module**: 100% (Cached Held-Karp)
+This document tracks the overall refactoring progress. Each module contains a checklist of atomic tasks that can be accessed in detail via their respective Markdown task files.
 
-## High-Level Milestones
-- [x] Environment Setup (`uv`, dependencies)
-- [x] Initial Tour Generation (End-to-end flow)
-- [x] Full Cascading K-Opt Engine Implementation (Verified N=100)
-- [ ] Sequential Sample Validation (N=100 -> N=500 -> N=115k)
-- [x] Final Gap Target (< 5%) - ACHIEVED (4.56%)
-- [ ] Ultra-Fine Gap Target (< 2%)
+---
 
-## Testing Checklist (Strict N=100 Start)
-- [x] **N=100 Validation**: SUCCESS (Gap 0.73%)
-- [x] **N=500 Validation**: SUCCESS (Gap 3.19%)
-- [x] **N=1,000 Validation**: SUCCESS (Gap 3.79%)
-- [x] **N=5,000 Validation**: SUCCESS (Gap 4.48%)
-- [x] **N=10,000 Validation**: SUCCESS (Gap 4.90%)
-- [x] **N=115,475 Validation**: SUCCESS (Gap 4.56%)
+## 1. Module Tasks Summary
 
-## Phase 2: Ultra-Fine Gap Closure (< 2%)
-- [ ] Research Recursive K-Opt vs. Sequential K-Opt.
-- [ ] Implement/Enable 4-opt and 5-opt in production runs.
-- [ ] Scale kick intensity (100k+ kicks).
-- [ ] Final Scale Validation (N=115,475) with Gap < 2%.
+- [ ] **Global Configuration Module** (Details: [config.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/config.md))
+  - [ ] [T1.1] Create configuration file `src/config.py` with default parameters.
+  - [ ] [T1.2] Implement configuration override validation tests.
 
-## Mandatory Compliance
-- [x] Sub-agents for all tasks.
-- [x] 5% Gap target.
-- [x] Start every test at N=100.
-- [x] At most 3-opt for initial phases.
+- [ ] **Preprocessing & Alignment Module** (Details: [preprocessing.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/preprocessing.md))
+  - [ ] [T2.1] Clear Delaunay filtering remnants.
+  - [ ] [T2.2] Implement 64-byte alignment check helper.
+  - [ ] [T2.3] Refine `hilbert_reorder_cities` for aligned contiguous data.
+  - [ ] [T2.4] Refine `build_candidate_sets` KD-Tree neighbor matrices.
+  - [ ] [T2.5] Refine `refine_candidate_set_with_alpha` with C-contiguity and alignment.
+  - [ ] [T2.6] Implement preprocessing correctness unit tests.
+
+- [ ] **Seed Generation & Rotation Module** (Details: [seed-generation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/seed-generation.md))
+  - [ ] [T3.1] Remove Hilbert and Random seeds standalone methods.
+  - [ ] [T3.2] Implement path cycle rotation function `rotate_tour`.
+  - [ ] [T3.3] Implement parallel Greedy NN seeding using `multiprocessing.Pool`.
+  - [ ] [T3.4] Implement seed generation unit tests.
+
+- [ ] **K-Opt Engine Module** (Details: [kopt-engine.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/kopt-engine.md))
+  - [ ] [T4.1] Delete `locked_edges` parameters from K-opt engine completely.
+  - [ ] [T4.2] Optimize distance precomputations with JIT-parallel SIMD directives.
+  - [ ] [T4.3] Refine `_optimize_2opt` using C-contiguous aligned arrays and DLB.
+  - [ ] [T4.4] Implement `_optimize_or_opt` relocate swaps.
+  - [ ] [T4.5] Refine `_optimize_3opt_sequential` implementing dynamic funneling (`K_3OPT`) and gain pruning.
+  - [ ] [T4.6] Refine `_optimize_4opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`).
+  - [ ] [T4.7] Refine `_optimize_5opt_sequential` implementing dynamic funneling (`K_3OPT`, `K_4OPT`, `K_5OPT`).
+  - [ ] [T4.8] Implement sequential cascade manager `_full_cascade` running up to 5-opt.
+  - [ ] [T4.9] Implement `_cascading_kopt_inner` ILS JIT chunk kick loops.
+  - [ ] [T4.10] Implement Python wrapper `cascading_kopt_optimize` asserting 64-byte alignments and return precise kick counts.
+  - [ ] [T4.11] Implement local search operators correctness unit tests.
+
+- [ ] **Orchestration Module** (Details: [orchestration.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/orchestration.md))
+  - [ ] [T5.1] Replace Manager proxy list with multiprocessing Array shared memory.
+  - [ ] [T5.2] Setup worker allocations under `NUM_PROCESSES_SOLVER`.
+  - [ ] [T5.3] Implement pool managers catching worker JIT errors and time budgets.
+  - [ ] [T5.4] Implement orchestration unit tests.
+
+- [ ] **Validation & Held-Karp Module** (Details: [validation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/validation.md))
+  - [ ] [T6.1] Clean up `locked_edges` parameters from validation subroutines.
+  - [ ] [T6.2] Optimize MST weight calculations and subgradients with JIT-parallel.
+  - [ ] [T6.3] Implement JIT-parallel Alpha value estimation.
+  - [ ] [T6.4] Implement validation unit tests.
+
+- [ ] **Data I/O & Persistence Module** (Details: [data-io.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/data-io.md))
+  - [ ] [T7.1] Implement CSV tour length loading `load_best_length_from_csv`.
+  - [ ] [T7.2] Restructure `update_best_tour` with `is_full_run` conditional checks.
+  - [ ] [T7.3] Fix and run I/O verification unit tests.
+
+- [ ] **Main Pipeline & Integration Module** (Details: [main.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/main.md))
+  - [ ] [T8.1] Connect all refactored parts inside main entry script.
+  - [ ] [T8.2] Execute progressive scale checks (N=100 -> 500 -> 1000 -> 5000 -> 115,475) to achieve Gap < 5% and runtime < 10 mins.

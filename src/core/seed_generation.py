@@ -181,3 +181,17 @@ def generate_greedy_nn_seeds(
         seeds[i] = _greedy_nn_tour(coords, candidate_set, int(start_nodes[i]))
 
     return seeds
+
+
+def generate_random_seeds(
+    n: int, num_seeds: int = 1
+) -> np.ndarray:
+    """
+    Generate random permutation seeds.
+    Used to benchmark more structured seeding strategies.
+    """
+    seeds = np.empty((num_seeds, n), dtype=np.int32)
+    base = np.arange(n, dtype=np.int32)
+    for i in range(num_seeds):
+        seeds[i] = np.random.permutation(base)
+    return seeds

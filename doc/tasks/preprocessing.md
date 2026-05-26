@@ -1,18 +1,8 @@
-# Preprocessing Module Tasks
+# Preprocessing Module Task List
 
-- [x] **Task 1: Delaunay Triangulation Wrapper**
-  - Use `scipy.spatial.Delaunay` to get initial edge connectivity.
-  - Convert Delaunay simplices into an adjacency list (sparse representation).
-- [x] **Task 2: Numba-Accelerated Neighbor Filtering (Core)**
-  - Implement `@njit(parallel=True)` function `_filter_nearest_neighbors`.
-  - Input: `coords`, `adjacency_list`, `offset_list`, `k=16`.
-  - For each city, sort its Delaunay neighbors by Euclidean distance and pick top 16.
-- [x] **Task 3: Memory Optimization**
-  - Ensure the output `candidate_set` is `np.int32` to minimize memory footprint for 115k cities.
-  - Verify that the candidate set shape is exactly `(N, 16)`.
-- [x] **Task 4: Unit Testing Neighbors**
-  - Create a test with 10 cities in a known grid.
-  - Manually calculate nearest neighbors and compare with `build_candidate_sets` output.
-- [x] **Task 5: Performance Benchmarking**
-  - Run the module on 115k cities and measure execution time.
-  - Aim for < 10 seconds for the entire preprocessing phase. (Result: ~0.7s)
+- [ ] **[T2.1]** Clean up Delaunay neighbor filtering remnants from [preprocessing.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/preprocessing.py) (Delete `_filter_nearest_neighbors` and any Delaunay variables).
+- [ ] **[T2.2]** Implement a 64-byte alignment check and correction helper `ensure_alignment(arr, alignment=64)` to align coordinate and tour arrays to Cache Lines for optimal JIT performance.
+- [ ] **[T2.3]** Refine `hilbert_reorder_cities` to sort coordinates along the Hilbert space-filling curve, returning 64-byte aligned, C-contiguous coordinate matrices and inverse mapping arrays. *(Depends on [T2.2])*
+- [ ] **[T2.4]** Refine `build_candidate_sets` to compute base nearest-neighbors using `scipy.spatial.KDTree` returning a 64-byte aligned C-contiguous matrix of shape `(N, KD_TREE_QUERY_SIZE)`. *(Depends on [T2.2])*
+- [ ] **[T2.5]** Refine `refine_candidate_set_with_alpha` to compute Alpha values, sort candidates, slice to the first `K_NEIGHBORS` elements, and return a 64-byte aligned C-contiguous array of shape `(N, K_NEIGHBORS)`. *(Depends on [T2.4])*
+- [ ] **[T2.6]** Write unit tests in `tests/test_preprocessing.py` validating memory alignment constraints, Hilbert reordering index correctness, KD-Tree neighbors validation, and Alpha-sorted slice correctness under JIT disabled test runs.

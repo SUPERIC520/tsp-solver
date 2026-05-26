@@ -1,16 +1,6 @@
-# Seed Generation Module Tasks
+# Seed Generation Module Task List
 
-- [x] **Task 1: Hilbert Curve Mapping**
-  - Implement a function to map 2D `(x, y)` coordinates to a 1D Hilbert integer.
-- [x] **Task 2: Rotated/Transformed Hilbert Sorts**
-  - Implement `generate_hilbert_seeds(coords, num_seeds=8)`.
-  - Apply 8 different transformations to ensure diversity.
-- [x] **Task 3: Permutation Validation**
-  - Write a test to ensure every seed is a valid permutation of `range(N)`.
-  - Check that all 8 seeds are unique.
-- [x] **Task 4: N=100 Validation**
-  - Start verification at N=100.
-
-## Mandatory Rules
-- [x] **Sub-Agent**: MUST use a specialized sub-agent for every task.
-- [x] **Seeds**: Exactly 8 seeds max.
+- [ ] **[T3.1]** Remove standalone Hilbert-based seed generation (`generate_hilbert_seeds`) and random seed generation (`generate_random_seeds`) from [seed_generation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/seed_generation.py).
+- [ ] **[T3.2]** Implement `rotate_tour(tour, start_node)` to rotate starting node sequence while keeping the path cycle topology unchanged. Ensure the output array is C-contiguous and 64-byte aligned.
+- [ ] **[T3.3]** Implement multi-process parallel seed generation `generate_greedy_nn_seeds` using `multiprocessing.Pool` (bounded by `NUM_PROCESSES_SEEDING` processes) to compute Greedy NN tours starting from distinct nodes in parallel. Returns a 64-byte aligned contiguous matrix of shape `(num_seeds, N)`.
+- [ ] **[T3.4]** Write unit tests in `tests/test_seed_generation.py` checking `rotate_tour` output and parallel NN seed generation dimensions, non-duplication, and coordinate mapping correctness under disabled JIT test runs.

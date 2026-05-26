@@ -1,14 +1,5 @@
-# Data I/O Module Tasks
+# Data I/O & Persistence Module Task List
 
-- [x] **Task 1: Basic CSV Loading**
-  - Implement `load_cities(filepath: str) -> np.ndarray` using `np.loadtxt` or `pandas`.
-  - Ensure coordinates are loaded as `float64`.
-  - Handle the "Index X Y" format specifically.
-- [x] **Task 2: Verification of Loading**
-  - Create `tests/data/sample_cities.csv` (small set of 5-10 cities).
-  - Write a test script to assert shape and values of loaded coordinates.
-- [x] **Task 3: Tour Export Functionality**
-  - Implement `save_tour(filepath: str, tour: np.ndarray, length: float)`.
-  - Output should include the ordered indices and the final total length.
-- [x] **Task 4: Result Validation**
-  - Verify that a saved tour can be re-loaded and its length recalculated correctly.
+- [ ] **[T7.1]** Implement `load_best_length_from_csv(filepath)` in [data_io.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/utils/data_io.py) to parse saved tour file lengths and return `np.inf` on file missing/corrupt.
+- [ ] **[T7.2]** Restructure `update_best_tour` in [persistence.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/utils/persistence.py) to check for a global improvement and gate it with an `is_full_run` conditional check to prevent overwriting global solutions with sub-scale test runs.
+- [ ] **[T7.3]** Fix imports and run all unit tests in `tests/test_data_io.py` and `tests/test_data_io_extended.py` to verify persistence integrity. *(Depends on [T7.1] and [T7.2])*

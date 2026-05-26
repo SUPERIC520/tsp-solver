@@ -348,79 +348,120 @@ This file contains the individual benchmark trial logs detailing specific parame
 - **Seed results**: 6476896, 6441687, 6479273, 6483625, 6490618, 6444479, **6439023** (best), 6443814
 - **Note**: Time limit cut ~3,000 kicks (from 25k to ~22k effective) but greedy NN basin is good enough that the result is still well under 5% gap
 
-## [2026-05-25 19:15] - Comprehensive Seeding Strategy Experiment (N=5,000, max_opt=5)
 
-**Held-Karp Lower Bound**: 251684.88
-**Goal**: Evaluate 16 different seeding and re-seeding configurations across 800 total trials.
+## [2026-05-23 22:03] - Full Scale Bench N=5000
+- **Params**: seeds=8, kicks=5000, iterations=1, hk_iter=2000, max_opt=3, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=3.1415%, LB=251684.88, Best=259591.56, Time=5.45s
+- **Status**: SUCCESS
 
-### Initial Seeding Comparison (N=5,000, max_opt=5, kicks=500, iters=1)
-| ID | Configuration                           | Trials | Avg Length | Avg Gap (%) | Std Dev | Min       | Max       | Avg Time (s) |
-|----|-----------------------------------------|--------|------------|-------------|---------|-----------|-----------|--------------|
-| 1  | 100% Hilbert                            | 49     | 268553.04  | 6.7021%     | 532.23  | 266698.02 | 269686.64 | 5.8          |
-| 2  | 100% Random                             | 49     | 266644.01  | 5.9436%     | 534.25  | 265351.05 | 267803.11 | 5.8          |
-| 3  | 100% Greedy NN                          | 49     | 266055.68  | 5.7098%     | 463.07  | 264591.98 | 266917.69 | 5.5          |
-| 4  | 50% Hilbert + 50% Random                | 49     | 267098.09  | 6.1240%     | 584.68  | 265612.26 | 268572.40 | 5.4          |
-| 5  | 50% Hilbert + 50% Greedy NN             | 49     | 266622.04  | 5.9349%     | 503.20  | 265349.92 | 267793.40 | 5.5          |
-| 6  | 50% Random + 50% Greedy NN              | 49     | 266452.93  | 5.8677%     | 456.13  | 265233.17 | 267436.49 | 5.4          |
-| 7  | 75% Hilbert + 25% Greedy NN             | 49     | 266764.84  | 5.9916%     | 514.09  | 265731.39 | 268133.16 | 5.6          |
-| 8  | Balanced Mix (4H, 4R, 4G)               | 49     | 266551.69  | 5.9069%     | 491.77  | 265627.55 | 267724.10 | 5.5          |
+## [2026-05-23 22:03] - Full Scale Bench N=5000
+- **Params**: seeds=8, kicks=5000, iterations=1, hk_iter=2000, max_opt=4, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=3.2122%, LB=251684.88, Best=259769.52, Time=5.46s
+- **Status**: SUCCESS
 
-### Re-seeding Strategy Comparison (N=5,000, max_opt=5, kicks=100, iters=5)
-| ID | Configuration                           | Trials | Avg Length | Avg Gap (%) | Std Dev | Min       | Max       | Avg Time (s) |
-|----|-----------------------------------------|--------|------------|-------------|---------|-----------|-----------|--------------|
-| 9  | 100% Continuation (No Resets)           | 49     | 266694.02  | 5.9635%     | 524.63  | 265316.45 | 267975.78 | 24.9         |
-| 10 | 100% Best (Exploitation)                | 49     | 265569.31  | 5.5166%     | 615.70  | 264543.63 | 266991.25 | 24.9         |
-| 11 | 50% Best + 50% fresh Hilbert            | 49     | 265795.73  | 5.6066%     | 633.50  | 264257.31 | 267068.59 | 24.8         |
-| 12 | 75% Best + 25% fresh Hilbert            | 49     | 265625.77  | 5.5390%     | 604.90  | 264548.20 | 267022.86 | 24.7         |
-| 13 | 50% Best + 50% fresh Random             | 49     | 266035.79  | 5.7019%     | 627.93  | 264775.83 | 267590.41 | 24.4         |
-| 14 | 75% Best + 25% fresh Random             | 49     | 265756.51  | 5.5910%     | 623.19  | 264709.12 | 267817.91 | 24.4         |
-| 15 | 50% Best + 25% Hilbert + 25% Random     | 49     | 265866.64  | 5.6347%     | 610.19  | 264644.57 | 266877.82 | 24.4         |
-| 16 | 50% Best + 25% Hilbert + 25% Greedy NN  | 49     | 265773.52  | 5.5977%     | 610.34  | 264301.31 | 267131.69 | 24.3         |
+## [2026-05-23 22:03] - Full Scale Bench N=5000
+- **Params**: seeds=8, kicks=5000, iterations=1, hk_iter=2000, max_opt=5, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=3.2235%, LB=251684.88, Best=259797.94, Time=5.47s
+- **Status**: SUCCESS
 
-### Statistical Significance Analysis (Configs 1-16)
-- **ANOVA Initial (Group A)**: F=105.4702, p=2.07e-85 (Highly Significant)
-- **ANOVA Re-seed (Group B)**: F=16.7329, p=2.74e-19 (Highly Significant)
-- **Verdict**: Greedy NN is the superior initial seed. "100% Best" exploitation is the most robust re-seeding strategy.
+## [2026-05-23 22:04] - Full Scale Bench N=5000
+- **Params**: seeds=8, kicks=5000, iterations=1, hk_iter=2000, max_opt=3, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=3.1154%, LB=251684.88, Best=259525.87, Time=5.41s
+- **Status**: SUCCESS
 
-### Final Long-Run Seeding Comparison (N=5,000, max_opt=5, kicks=100, iters=10)
-**Strategy**: All configs reset to current global best (100% Best) after each iteration.
+## [2026-05-23 22:04] - Full Scale Bench N=10000
+- **Params**: seeds=4, kicks=2000, iterations=1, hk_iter=2000, max_opt=3, processes=4, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=7.7069%, LB=615978.91, Best=663451.83, Time=5.20s
+- **Status**: FAILURE
 
-| ID | Configuration                           | Trials | Avg Length | Avg Gap (%) | Std Dev | Min       | Max       | Avg Time (s) |
-|----|-----------------------------------------|--------|------------|-------------|---------|-----------|-----------|--------------|
-| 1  | LR: 100% Hilbert                        | 50     | 264227.44  | 4.9834%     | 546.30  | 262827.19 | 265433.71 | 57.1         |
-| 2  | LR: 100% Random                         | 25     | 263275.53  | 4.6052%     | 577.15  | 262270.59 | 264735.24 | 55.7         |
-| 3  | LR: 100% Greedy NN                      | 9      | 262885.69  | 4.4503%     | 543.22  | 261898.73 | 263602.61 | 53.9         |
+## [2026-05-23 22:04] - Full Scale Bench N=10000
+- **Params**: seeds=4, kicks=2000, iterations=1, hk_iter=2000, max_opt=4, processes=4, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=7.8089%, LB=615978.91, Best=664080.31, Time=4.84s
+- **Status**: FAILURE
 
-#### Statistical Significance Analysis (Long-Run)
-- **One-way ANOVA p-value**: 2.1084e-12 (Highly Significant)
-- **F-statistic**: 38.1597
-- **Tukey HSD Insights**:
-    - Hilbert (1) vs Random (2): **Significant** ($p < 2.04e-09$)
-    - Hilbert (1) vs Greedy NN (3): **Significant** ($p < 8.58e-09$)
-    - Random (2) vs Greedy NN (3): **Not Significant** ($p = 0.174$) at this sample size, though Greedy NN trended better.
+## [2026-05-23 22:04] - Full Scale Bench N=10000
+- **Params**: seeds=4, kicks=2000, iterations=1, hk_iter=2000, max_opt=5, processes=4, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=7.8389%, LB=615978.91, Best=664265.06, Time=4.86s
+- **Status**: FAILURE
 
-#### Raw Long-Run Trial Data
-| ID | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8 | T9 | T10 | T11 | T12 | T13 | T14 | T15 | T16 | T17 | T18 | T19 | T20 | T21 | T22 | T23 | T24 | T25 | T26 | T27 | T28 | T29 | T30 | T31 | T32 | T33 | T34 | T35 | T36 | T37 | T38 | T39 | T40 | T41 | T42 | T43 | T44 | T45 | T46 | T47 | T48 | T49 | T50 |
-|----|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|-----------|
-| 1  | 264357.02 | 264616.57 | 263950.78 | 264480.74 | 264224.50 | 262827.19 | 264638.70 | 264415.35 | 265231.54 | 263744.22 | 264126.09 | 263759.11 | 264594.71 | 264715.13 | 264333.97 | 264192.49 | 265433.71 | 264599.81 | 264052.24 | 262927.64 | 264452.41 | 264828.58 | 263093.27 | 264886.89 | 264514.61 | 264280.60 | 264723.65 | 264529.32 | 264468.11 | 264476.85 | 264579.20 | 264175.20 | 263870.65 | 264004.70 | 264762.30 | 264453.42 | 264100.08 | 263831.15 | 263821.93 | 264137.88 | 263363.70 | 264760.08 | 264720.69 | 264091.40 | 264073.23 | 263968.43 | 263967.25 | 264426.97 | 262926.12 | 263861.78 |
-| 2  | 264735.24 | 262270.59 | 263029.72 | 263169.13 | 263499.50 | 263039.90 | 263813.29 | 263855.14 | 263742.97 | 263154.21 | 263004.27 | 262842.58 | 263685.07 | 263781.57 | 262579.15 | 262840.79 | 262642.34 | 263364.93 | 263398.40 | 263641.03 | 262990.25 | 262787.45 | 264237.22 | 263317.61 | 262465.87 |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |
-| 3  | 262788.10 | 263352.32 | 262747.36 | 262290.61 | 261898.73 | 262794.03 | 263241.29 | 263602.61 | 263256.12 |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |           |
+## [2026-05-23 22:09] - Full Scale Bench N=10000
+- **Params**: seeds=8, kicks=100000, iterations=1, hk_iter=2000, max_opt=5, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=4.5340%, LB=615978.91, Best=643907.22, Time=223.29s
+- **Status**: SUCCESS
 
-**Conclusion**: The initial advantage of **Greedy NN** persists in the long run (10 iterations), yielding the lowest average gap (**4.45%**). **Random** starts are significantly better than Hilbert starts (**4.61%** vs **4.98%**), confirming that Hilbert seeds trap the search in inferior basins of attraction.
+## [2026-05-23 22:38] - Full Scale Bench N=10000
+- **Params**: seeds=8, kicks=25000, iterations=1, hk_iter=2000, max_opt=3, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=5.0550%, LB=615978.91, Best=647116.44, Time=46.84s
+- **Status**: FAILURE
 
-## [2026-05-25 20:37] - Long-Run Seeding Experiment (N=100, max_opt=5)
-- **Held-Karp LB**: 27175.81
-- **Parameters**: seeds=12, kicks_per_iter=10, iterations=2, trials=1
-- **Strategy**: All workers reset to global best (100% Best) after each iteration.
+## [2026-05-23 22:39] - Full Scale Bench N=1000
+- **Params**: seeds=8, kicks=25000, iterations=1, hk_iter=2000, max_opt=3, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=1.3632%, LB=77728.46, Best=78788.06, Time=6.68s
+- **Status**: SUCCESS
 
-### Summary Table (10 Iterations)
-| ID | Configuration                           | Trials | Avg Length | Avg Gap (%) | Std Dev | Min       | Max       | Avg Time (s) |
-|----|-----------------------------------------|--------|------------|-------------|---------|-----------|-----------|--------------|
-| 1  | LR: 100% Hilbert                        | 1      | 27531.12   | 1.3074%     | 0.00    | 27531.12  | 27531.12  | 8.3          |
-| 2  | LR: 100% Random                         | 1      | 27814.92   | 2.3517%     | 0.00    | 27814.92  | 27814.92  | 8.4          |
-| 3  | LR: 100% Greedy NN                      | 1      | 27597.43   | 1.5514%     | 0.00    | 27597.43  | 27597.43  | 8.8          |
-| 4  | LR: 50/50 Hil/Rand                      | 1      | 27392.17   | 0.7962%     | 0.00    | 27392.17  | 27392.17  | 8.8          |
-| 5  | LR: 50/50 Hil/Greedy                    | 1      | 27578.46   | 1.4817%     | 0.00    | 27578.46  | 27578.46  | 8.3          |
-| 6  | LR: 50/50 Rand/Greedy                   | 1      | 27440.92   | 0.9755%     | 0.00    | 27440.92  | 27440.92  | 7.8          |
-| 7  | LR: 75/25 Hil/Greedy                    | 1      | 27375.45   | 0.7346%     | 0.00    | 27375.45  | 27375.45  | 7.7          |
-| 8  | LR: Balanced Mix                        | 1      | 27650.45   | 1.7465%     | 0.00    | 27650.45  | 27650.45  | 7.8          |
+## [2026-05-23 22:45] - Full Scale Bench N=1000
+- **Params**: seeds=8, kicks=25000, iterations=1, hk_iter=2000, max_opt=3, processes=8, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=0.9975%, LB=77728.46, Best=78503.83, Time=5.70s
+- **Status**: SUCCESS
+
+## [2026-05-24 00:06] - Full Scale Bench N=10000
+- **Params**: seeds=12, kicks=15000, iterations=1, hk_iter=2000, max_opt=3, processes=12, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=5.2312%, LB=615978.91, Best=648201.69, Time=35.85s
+- **Status**: FAILURE
+
+## [2026-05-24 00:07] - Full Scale Bench N=10000
+- **Params**: seeds=12, kicks=15000, iterations=1, hk_iter=2000, max_opt=4, processes=12, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=5.1960%, LB=615978.91, Best=647985.36, Time=36.87s
+- **Status**: FAILURE
+
+## [2026-05-24 00:08] - Full Scale Bench N=5000
+- **Params**: seeds=12, kicks=25000, iterations=1, hk_iter=2000, max_opt=3, processes=12, backbone_threshold=0.99, no_backbone=False
+- **Results**: Gap=2.3692%, LB=251684.88, Best=257647.82, Time=22.80s
+- **Status**: SUCCESS
+
+## [2026-05-24 19:07] - CS vs Max-K Grid Search (N=500, Kicks=500)
+- **Params**: seeds=1, kicks=500, n=500, comparison between standard and cascading modes across CS size [8, 16, 32, 64] and Max-K [3, 4, 5, 6, 7].
+- **Results**:
+| CS | Max-K | Mode | Best Len | Time (s) | Gap (%) |
+|---|---|---|---|---|---|
+| 8 | 3 | standard | 55345.74 | 2.68 | 1.6886% |
+| 8 | 3 | cascading | 55526.89 | 1.23 | 2.0215% |
+| 8 | 4 | standard | 55435.41 | 4.36 | 1.8534% |
+| 8 | 4 | cascading | 55456.00 | 1.19 | 1.8912% |
+| 8 | 5 | standard | 55440.93 | 6.20 | 1.8635% |
+| 8 | 5 | cascading | 55770.27 | 1.40 | 2.4686% |
+| 8 | 6 | standard | 55314.78 | 9.37 | 1.6317% |
+| 8 | 6 | cascading | 55461.63 | 1.24 | 1.9015% |
+| 8 | 7 | standard | 55289.26 | 9.33 | 1.5848% |
+| 8 | 7 | cascading | 55630.27 | 1.34 | 2.2114% |
+| 16 | 3 | standard | 55290.08 | 3.33 | 1.5864% |
+| 16 | 3 | cascading | 55854.22 | 1.82 | 2.6229% |
+| 16 | 4 | standard | 55218.41 | 5.45 | 1.4547% |
+| 16 | 4 | cascading | 55629.90 | 1.77 | 2.2107% |
+| 16 | 5 | standard | 55300.60 | 7.64 | 1.6057% |
+| 16 | 5 | cascading | 55579.95 | 1.86 | 2.1189% |
+| 16 | 6 | standard | 55297.81 | 8.52 | 1.6006% |
+| 16 | 6 | cascading | 55731.13 | 1.99 | 2.3967% |
+| 16 | 7 | standard | 55255.62 | 12.58 | 1.5230% |
+| 16 | 7 | cascading | 55655.06 | 1.79 | 2.2569% |
+| 32 | 3 | standard | 55283.34 | 3.44 | 1.5740% |
+| 32 | 3 | cascading | 55654.75 | 1.84 | 2.2564% |
+| 32 | 4 | standard | 55293.88 | 4.94 | 1.5933% |
+| 32 | 4 | cascading | 55530.14 | 2.11 | 2.0274% |
+| 32 | 5 | standard | 55289.26 | 7.02 | 1.5848% |
+| 32 | 5 | cascading | 55600.01 | 2.10 | 2.1558% |
+| 32 | 6 | standard | 55293.88 | 8.66 | 1.5933% |
+| 32 | 6 | cascading | 55615.26 | 1.89 | 2.1838% |
+| 32 | 7 | standard | 55396.89 | 13.56 | 1.7826% |
+| 32 | 7 | cascading | 55364.99 | 1.64 | 1.7240% |
+| 64 | 3 | standard | 55294.07 | 3.18 | 1.5937% |
+| 64 | 3 | cascading | 55350.80 | 1.81 | 1.6979% |
+| 64 | 4 | standard | 55416.78 | 4.82 | 1.8191% |
+| 64 | 4 | cascading | 55370.36 | 1.89 | 1.7339% |
+| 64 | 5 | standard | 55459.36 | 6.75 | 1.8974% |
+| 64 | 5 | cascading | 55733.25 | 1.80 | 2.4006% |
+| 64 | 6 | standard | 55299.79 | 7.97 | 1.6042% |
+| 64 | 6 | cascading | 55329.82 | 1.73 | 1.6594% |
+| 64 | 7 | standard | 55407.21 | 10.74 | 1.8016% |
+| 64 | 7 | cascading | 55437.54 | 1.66 | 1.8573% |
+- **Status**: SUCCESS

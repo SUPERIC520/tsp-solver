@@ -1,12 +1,6 @@
-# Validation Module Tasks
+# Validation Module Task List
 
-- [x] **Task 1: 1-tree Lower Bound Implementation**
-  - Implement a Prim-based or Kruskal-based MST algorithm restricted to `candidate_set` edges.
-- [x] **Task 2: Subgradient Optimization Loop**
-  - Implement the iterative update of Lagrange multipliers.
-- [x] **Task 3: Gap Calculation**
-  - Implement `validate_result(best_length, lower_bound)`.
-- [x] **Task 4: Validation against TSPLIB**
-- [ ] **Task 5: HK Cache Integration**
-  - Implement persistence for HK bound and Pi vector to `data/` using `npy` format.
-  - Ensure `main.py` and benchmarks check the cache first.
+- [ ] **[T6.1]** Completely clean up `locked_edges` parameters and variables from [validation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/validation.py).
+- [ ] **[T6.2]** Optimize `_compute_hk_impl` subgradient descent loop with `@njit(fastmath=True, parallel=True)` for distance calculations and MST weight summaries. Implement file-based caching inside `compute_hk_lower_bound` to store/retrieve lower bounds and Pi vectors.
+- [ ] **[T6.3]** Optimize `compute_alpha_values` using `@njit(fastmath=True, parallel=True)` to parallelize edge Alpha evaluations across nodes. *(Depends on [T6.2])*
+- [ ] **[T6.4]** Write unit tests in `tests/test_validation.py` checking HK bound precision and computed Alpha arrays dimensions and shape matching.
