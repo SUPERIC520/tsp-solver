@@ -35,9 +35,7 @@ def warmup_numba_jit() -> None:
         cands = [j for j in range(n) if j != i]
         candidate_set[i, : len(cands)] = cands
 
-    locked_edges = np.full((n, 2), -1, dtype=np.int32)
-
     # This single call compiles all JIT-decorated kernels used by tests
     cascading_kopt_optimize(
-        tour, coords_x, coords_y, candidate_set, locked_edges, num_kicks=1
+        tour, coords_x, coords_y, candidate_set, num_kicks=1
     )

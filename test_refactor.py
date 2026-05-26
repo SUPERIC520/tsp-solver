@@ -25,8 +25,8 @@ def test_kopt():
     
     print("Initial length:", compute_tour_length(initial_tour, coords[:, 0], coords[:, 1]))
     
-    best_tour, best_length = cascading_kopt_optimize(
-        initial_tour, coords[:, 0], coords[:, 1], candidate_set, locked_edges, num_kicks=10, max_opt=3
+    best_tour, best_length, kicks_done = cascading_kopt_optimize(
+        initial_tour, coords[:, 0], coords[:, 1], candidate_set, num_kicks=10, max_opt=3
     )
     
     print("Optimized tour:", best_tour)

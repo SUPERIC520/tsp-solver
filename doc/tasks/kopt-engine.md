@@ -1,6 +1,6 @@
 # K-Opt Engine Module Task List
 
-- [ ] **[T4.1]** Search and completely remove `locked_edges` from all function signatures, variable layouts, and local search routines inside [kopt_engine.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/kopt_engine.py).
+- [x] **[T4.1]** Search and completely remove `locked_edges` from all function signatures, variable layouts, and local search routines inside [kopt_engine.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/kopt_engine.py).
 - [ ] **[T4.2]** Apply `@njit(fastmath=True, parallel=True)` for parallel precomputations and array calculations like `_precompute_candidate_dists` to compile optimal LLVM SIMD code.
 - [ ] **[T4.3]** Refine `_optimize_2opt` using 64-byte aligned contiguous distance arrays and DLB pruning, iterating candidates up to `K_NEIGHBORS`.
 - [ ] **[T4.4]** Implement `_optimize_or_opt` for relocate moves of segments up to length `max_len = OR_OPT_MAX_LEN` utilizing C-contiguous data layouts. *(Depends on [T4.3])*

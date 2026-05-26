@@ -28,8 +28,8 @@ def benchmark(n: int = 500) -> None:
     # 5. Single Solve
     locked_edges = np.full((n, 2), -1, dtype=np.int32)
     start_solve = time.time()
-    tour, length = cascading_kopt_optimize(
-        seeds[0], coords[:, 0], coords[:, 1], candidate_set, locked_edges, num_kicks=0
+    tour, length, kicks = cascading_kopt_optimize(
+        seeds[0], coords[:, 0], coords[:, 1], candidate_set, num_kicks=0
     )
     solve_time = time.time() - start_solve
     print(f"Single Solve completed in {solve_time:.2f}s. Length: {length:.2f}")

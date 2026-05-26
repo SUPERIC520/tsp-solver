@@ -30,26 +30,12 @@ def _kopt_worker(
         
         global _shared_progress_array
         
-        # Check signature of kopt_optimize_tour for locked_edges compatibility (defensive)
-        import inspect
-        sig = inspect.signature(kopt_optimize_tour)
-        func: Any = kopt_optimize_tour
-        if "locked_edges" in sig.parameters:
-            n = seed.shape[0]
-            locked_edges = np.full((n, 2), -1, dtype=np.int32)
-            res = func(
-                seed, coords_x, coords_y, candidate_set, locked_edges, num_kicks, max_opt,
-                time_limit_s=time_limit_s,
-                progress_array=_shared_progress_array,
-                seed_idx=seed_idx,
-            )
-        else:
-            res = func(
-                seed, coords_x, coords_y, candidate_set, num_kicks, max_opt,
-                time_limit_s=time_limit_s,
-                progress_array=_shared_progress_array,
-                seed_idx=seed_idx,
-            )
+        res = kopt_optimize_tour(
+            seed, coords_x, coords_y, candidate_set, num_kicks, max_opt,
+            time_limit_s=time_limit_s,
+            progress_array=_shared_progress_array,
+            seed_idx=seed_idx,
+        )
         return res  # type: ignore[no-any-return]
     except Exception as e:
         return e
@@ -59,7 +45,6 @@ def parallel_solve(
     seeds: np.ndarray,
     coords: np.ndarray,
     candidate_set: np.ndarray,
-    locked_edges: Any = None,
     num_processes: int = -1,
     num_kicks: int = 100,
     max_opt: int = 3,
@@ -73,13 +58,7 @@ def parallel_solve(
     """
     from src.config import NUM_PROCESSES_SOLVER
 
-    # Handle transitions / backward compatibility where locked_edges might be passed
-    actual_num_processes = num_processes
-    if locked_edges is not None:
-        if isinstance(locked_edges, (int, np.integer)):
-            actual_num_processes = int(locked_edges)
-
-    p_count = actual_num_processes
+    p_count = num_processes
     if p_count == -1:
         p_count = NUM_PROCESSES_SOLVER
     if p_count <= 0:

@@ -139,12 +139,11 @@ def main() -> None:
 
     # 4. Optimization
     print(f"[Step 6] Parallel optimization (kicks={args.kicks}, max_opt={args.max_opt}, iters={args.iters})...")
-    locked_edges = np.full((n, 2), -1, dtype=np.int32)
     num_processes = min(mp.cpu_count(), args.seeds)
     print(f"  - Running {args.seeds} parallel solvers on {num_processes} processes...")
 
     start_opt = time.time()
-    
+
     global_best_tour_new = None
     global_best_length = np.inf
 
@@ -155,17 +154,15 @@ def main() -> None:
         print(f"\n  [Iteration {current_iter}/{args.iters if args.iters > 0 else '∞'}]")
 
         results = parallel_solve(
-            seeds, 
-            coords, 
-            candidate_set, 
-            locked_edges, 
+            seeds,
+            coords,
+            candidate_set,
             num_processes=num_processes,
             num_kicks=args.kicks,
             max_opt=args.max_opt,
             iteration_start_time=iter_start,
             total_start_time=start_opt
-        )
-        
+        )        
         # Track iteration best
         iter_best_tour = None
         iter_best_length = np.inf

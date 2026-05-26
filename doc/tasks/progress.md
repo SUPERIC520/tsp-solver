@@ -25,7 +25,7 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [x] [T3.4] Implement seed generation unit tests.
 
 - [ ] **K-Opt Engine Module** (Details: [kopt-engine.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/kopt-engine.md))
-  - [ ] [T4.1] Delete `locked_edges` parameters from K-opt engine completely.
+  - [x] [T4.1] Delete `locked_edges` parameters from K-opt engine completely.
   - [ ] [T4.2] Optimize distance precomputations with JIT-parallel SIMD directives.
   - [ ] [T4.3] Refine `_optimize_2opt` using C-contiguous aligned arrays and DLB.
   - [ ] [T4.4] Implement `_optimize_or_opt` relocate swaps.

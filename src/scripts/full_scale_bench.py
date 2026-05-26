@@ -52,13 +52,11 @@ def warmup() -> None:
     )
     from src.core.kopt_engine import cascading_kopt_optimize
 
-    locked = np.full((5, 2), -1, dtype=np.int32)
     cascading_kopt_optimize(
         np.array([0, 1, 2, 3, 4], dtype=np.int32),
         coords_x,
         coords_y,
         cs,
-        locked,
         num_kicks=2,
         max_opt=3,
     )
