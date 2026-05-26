@@ -10,13 +10,13 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [x] [T1.1] Create configuration file `src/config.py` with default parameters.
   - [x] [T1.2] Implement configuration override validation tests.
 
-- [ ] **Preprocessing & Alignment Module** (Details: [preprocessing.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/preprocessing.md))
-  - [ ] [T2.1] Clear Delaunay filtering remnants.
-  - [ ] [T2.2] Implement 64-byte alignment check helper.
-  - [ ] [T2.3] Refine `hilbert_reorder_cities` for aligned contiguous data.
-  - [ ] [T2.4] Refine `build_candidate_sets` KD-Tree neighbor matrices.
-  - [ ] [T2.5] Refine `refine_candidate_set_with_alpha` with C-contiguity and alignment.
-  - [ ] [T2.6] Implement preprocessing correctness unit tests.
+- [x] **Preprocessing & Alignment Module** (Details: [preprocessing.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/preprocessing.md))
+  - [x] [T2.1] Clear Delaunay filtering remnants.
+  - [x] [T2.2] Implement 64-byte alignment check helper.
+  - [x] [T2.3] Refine `hilbert_reorder_cities` for aligned contiguous data.
+  - [x] [T2.4] Refine `build_candidate_sets` KD-Tree neighbor matrices.
+  - [x] [T2.5] Refine `refine_candidate_set_with_alpha` with C-contiguity and alignment.
+  - [x] [T2.6] Implement preprocessing correctness unit tests.
 
 - [x] **Seed Generation & Rotation Module** (Details: [seed-generation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/seed-generation.md))
   - [x] [T3.1] Remove Hilbert and Random seeds standalone methods.
