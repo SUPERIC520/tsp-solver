@@ -105,12 +105,14 @@ def load_tour(filepath: str) -> tuple[np.ndarray, float]:
         return tour, length
 
 
+from src.config import CACHE_VERSION
+
 def get_hk_cache_paths(sample_name: str) -> tuple[str, str]:
     """
     Generate paths for HK bound and Pi vector cache.
     """
-    bound_path = f"data/sample_{sample_name}_hk.npy"
-    pi_path = f"data/sample_{sample_name}_pi.npy"
+    bound_path = f"data/sample_{sample_name}_hk_{CACHE_VERSION}.npy"
+    pi_path = f"data/sample_{sample_name}_pi_{CACHE_VERSION}.npy"
     return bound_path, pi_path
 
 

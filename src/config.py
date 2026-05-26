@@ -2,6 +2,10 @@
 Global configuration constants for the TSP solver.
 """
 
+# Cache version for generated artifacts (e.g. .npy bounds).
+# Bump this when changing caching logic or file formats to avoid branch conflicts.
+CACHE_VERSION: str = "v1"
+
 # Initial KD-Tree neighbor query count
 KD_TREE_QUERY_SIZE: int = 64
 
