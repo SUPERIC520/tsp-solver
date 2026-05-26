@@ -6,9 +6,9 @@ This document tracks the overall refactoring progress. Each module contains a ch
 
 ## 1. Module Tasks Summary
 
-- [ ] **Global Configuration Module** (Details: [config.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/config.md))
-  - [ ] [T1.1] Create configuration file `src/config.py` with default parameters.
-  - [ ] [T1.2] Implement configuration override validation tests.
+- [x] **Global Configuration Module** (Details: [config.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/config.md))
+  - [x] [T1.1] Create configuration file `src/config.py` with default parameters.
+  - [x] [T1.2] Implement configuration override validation tests.
 
 - [ ] **Preprocessing & Alignment Module** (Details: [preprocessing.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/preprocessing.md))
   - [ ] [T2.1] Clear Delaunay filtering remnants.
