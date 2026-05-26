@@ -1,6 +1,6 @@
 # Validation Module Task List
 
-- [ ] **[T6.1]** Completely clean up `locked_edges` parameters and variables from [validation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/validation.py).
+- [x] **[T6.1]** Completely clean up `locked_edges` parameters and variables from [validation.py](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/src/core/validation.py).
 - [ ] **[T6.2]** Optimize `_compute_hk_impl` subgradient descent loop with `@njit(fastmath=True, parallel=True)` for distance calculations and MST weight summaries. Implement file-based caching inside `compute_hk_lower_bound` to store/retrieve lower bounds and Pi vectors.
 - [ ] **[T6.3]** Optimize `compute_alpha_values` using `@njit(fastmath=True, parallel=True)` to parallelize edge Alpha evaluations across nodes. *(Depends on [T6.2])*
 - [ ] **[T6.4]** Write unit tests in `tests/test_validation.py` checking HK bound precision and computed Alpha arrays dimensions and shape matching.

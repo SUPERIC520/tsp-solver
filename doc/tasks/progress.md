@@ -44,7 +44,7 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [x] [T5.4] Implement orchestration unit tests.
 
 - [ ] **Validation & Held-Karp Module** (Details: [validation.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/validation.md))
-  - [ ] [T6.1] Clean up `locked_edges` parameters from validation subroutines.
+  - [x] [T6.1] Clean up `locked_edges` parameters from validation subroutines.
   - [ ] [T6.2] Optimize MST weight calculations and subgradients with JIT-parallel.
   - [ ] [T6.3] Implement JIT-parallel Alpha value estimation.
   - [ ] [T6.4] Implement validation unit tests.
