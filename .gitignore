@@ -23,5 +23,8 @@ scratch/
 logs/
 *.log
 
-# Data artifacts
-data/
+# Data artifacts — ignore generated files, keep source data
+data/*.npy
+data/solutions.csv
+data/best_tour.csv
+data/solution.txt
