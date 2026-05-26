@@ -66,7 +66,7 @@ def test_refine_candidate_set() -> None:
     candidate_set = build_candidate_sets(coords, k=10)
 
     lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=20)
-    refined_set = refine_candidate_set_with_alpha(coords, candidate_set, pi, k_neighbors=10)
+    refined_set = refine_candidate_set_with_alpha(coords, candidate_set, pi, top_k=10)
 
     assert refined_set.shape == candidate_set.shape
     # Check that it's different (likely, because alpha is better than distance)

@@ -3,8 +3,6 @@ import numpy as np
 import os
 import argparse
 import multiprocessing as mp
-import sys
-from typing import Tuple, Optional
 from src.utils.data_io import load_cities, save_solution_csv, load_tour
 from src.utils.persistence import update_best_tour
 from src.utils.time_utils import format_duration
@@ -23,13 +21,6 @@ def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
     pi_file = f"data/sample_{n}_pi.npy"
     np.save(hk_file, np.array([hk]))
     np.save(pi_file, pi)
-
-
-def format_duration(seconds: float) -> str:
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = int(seconds % 60)
-    return f"{hours}h {minutes}m {secs}s"
 
 
 def main() -> None:
@@ -77,7 +68,7 @@ def main() -> None:
     print(f"  - Initial preprocessing done in {dt:.2f}s.")
 
     # 2.5 HK Bound
-    print(f"[Step 3] Obtaining Held-Karp lower bound...")
+    print("[Step 3] Obtaining Held-Karp lower bound...")
     t0 = time.time()
     lb_val = None
     pi = None
@@ -108,6 +99,7 @@ def main() -> None:
     # 2.6 Refinement
     print("[Step 4] Refining candidate sets with Alpha-values...")
     t0 = time.time()
+    assert pi is not None
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
     candidate_set = candidate_set[:, :40]
     dt = time.time() - t0
@@ -177,14 +169,15 @@ def main() -> None:
         
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
-            global_best_tour_new = iter_best_tour.copy()
+            global_best_tour_new = iter_best_tour.copy() if iter_best_tour is not None else None
             print(f"  - Found new best length: {global_best_length:.2f}")
             
             # Save intermediate result
-            temp_best_tour = new_to_orig[global_best_tour_new]
-            save_solution_csv("data/solutions.csv", temp_best_tour, global_best_length)
-            if is_full_run:
-                update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
+            if global_best_tour_new is not None:
+                temp_best_tour = new_to_orig[global_best_tour_new]
+                save_solution_csv("data/solutions.csv", temp_best_tour, global_best_length)
+                if is_full_run:
+                    update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
         else:
             print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
             
@@ -198,25 +191,25 @@ def main() -> None:
     dt_opt = time.time() - start_opt
     print(f"\n  - Optimization completed in {dt_opt:.2f}s.")
     
-    best_tour_new = global_best_tour_new
-    best_length = global_best_length
+    if global_best_tour_new is None:
+        print("Error: No solution found.")
+        return
 
     # Map best tour back to original indices
-    assert best_tour_new is not None
-    best_tour = new_to_orig[best_tour_new]
+    best_tour = new_to_orig[global_best_tour_new]
 
     # 5. Validation
     print("\n[Step 7] Final Validation")
-    gap = validate_result(best_length, lb_val)
-    print(f"  - Best Length:     {best_length:.2f}")
+    gap = validate_result(global_best_length, lb_val)
+    print(f"  - Best Length:     {global_best_length:.2f}")
     print(f"  - HK Lower Bound:  {lb_val:.2f}")
     print(f"  - Solution Gap:    {gap:.4f}%")
 
     # 6. Save Results
     print("\n[Step 8] Saving results...")
-    save_solution_csv("data/solutions.csv", best_tour, best_length)
+    save_solution_csv("data/solutions.csv", best_tour, global_best_length)
     if is_full_run:
-        update_best_tour("data/best_tour.csv", best_tour, best_length)
+        update_best_tour("data/best_tour.csv", best_tour, global_best_length)
         print("  - Saved to data/solutions.csv and data/best_tour.csv")
     else:
         print("  - Saved to data/solutions.csv (Persistence skipped: not a full run)")

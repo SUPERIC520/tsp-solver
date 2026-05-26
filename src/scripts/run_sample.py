@@ -1,8 +1,7 @@
 import time
 import numpy as np
-import os
 import argparse
-from typing import Tuple, Optional
+from typing import Tuple
 from src.utils.data_io import load_cities
 from src.core.preprocessing import (
     build_candidate_sets,
@@ -111,7 +110,7 @@ def run_benchmark(
 
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
-            global_best_tour_new = iter_best_tour.copy()
+            global_best_tour_new = iter_best_tour.copy() if iter_best_tour is not None else None
             print(f"New best length: {global_best_length:.2f}")
         else:
             print(f"Iteration best: {iter_best_length:.2f} (No improvement)")
@@ -125,6 +124,10 @@ def run_benchmark(
 
     # 5. Validation
     print("\nStep 5: Final Validation")
+    if global_best_tour_new is None:
+        print("Error: No solution found.")
+        return 0.0, 0.0
+
     gap = validate_result(global_best_length, lb_val)
     print(f"Final Best Length: {global_best_length:.2f}")
     print(f"HK Lower Bound: {lb_val:.2f}")

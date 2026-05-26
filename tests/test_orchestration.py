@@ -15,7 +15,7 @@ def test_parallel_solve_basic() -> None:
     locked_edges = np.full((n, 2), -1, dtype=np.int32)
 
     results = parallel_solve(
-        seeds, coords, candidate_set, locked_edges, num_processes=2
+        seeds, coords, candidate_set, num_processes=2
     )
 
     assert len(results) == 4
