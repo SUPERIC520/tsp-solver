@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from src.core.orchestration import parallel_solve
 
 
@@ -64,7 +65,7 @@ def test_parallel_solve_scaling() -> None:
     assert len(res_4) == 3
 
 
-def test_parallel_solve_progress_reporting(capsys: pytest.CaptureFixture) -> None:
+def test_parallel_solve_progress_reporting(capsys: pytest.CaptureFixture[str]) -> None:
     # Verify that status logs and progress are printed during execution
     n = 20
     coords = np.random.rand(n, 2).astype(np.float64)
@@ -88,20 +89,23 @@ def test_parallel_solve_failure_recovery() -> None:
     n = 20
     coords = np.random.rand(n, 2).astype(np.float64)
     seeds = np.array([np.random.permutation(n).astype(np.int32) for _ in range(2)])
-    
-    # Passing an invalid candidate set with strings triggers a ValueError during parsing in the worker
+
+    # Passing an invalid candidate set with strings triggers a ValueError
+    # during parsing in the worker
     invalid_candidate_set = np.full((n, 5), "invalid", dtype=object)
 
     results = parallel_solve(
         seeds, coords, invalid_candidate_set, num_processes=2
     )
 
-    # It must catch the exception, terminate the pool, and return the intermediate results
+    # It must catch the exception, terminate the pool, and return the
+    # intermediate results
     assert isinstance(results, list)
 
 
 def test_parallel_solve_timeout() -> None:
-    # Test that solver terminates and returns intermediate results when exceeding time budget
+    # Test that solver terminates and returns intermediate results when
+    # exceeding time budget
     n = 20
     coords = np.random.rand(n, 2).astype(np.float64)
     seeds = np.array([np.random.permutation(n).astype(np.int32) for _ in range(4)])

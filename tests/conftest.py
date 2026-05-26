@@ -16,9 +16,9 @@ import pytest  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def warmup_numba_jit() -> None:
-    """
-    Session-scoped fixture that runs a tiny N=5 problem ONCE before any test
-    to trigger Numba JIT compilation. All subsequent tests will use the
+    """Session-scoped fixture that runs a tiny N=5 problem ONCE before any test.
+
+    To trigger Numba JIT compilation. All subsequent tests will use the
     cached compiled kernels and run fast.
     """
     from src.core.kopt_engine import cascading_kopt_optimize

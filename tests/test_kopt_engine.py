@@ -1,20 +1,23 @@
+from collections.abc import Generator
+
+import numba
 import numpy as np
 import pytest
-import numba
+
 from src.core.kopt_engine import (
     _optimize_2opt,
-    _optimize_or_opt,
     _optimize_3opt_sequential,
     _optimize_4opt_sequential,
     _optimize_5opt_sequential,
+    _optimize_or_opt,
+    _update_pos,
     cascading_kopt_optimize,
     compute_tour_length,
-    _update_pos,
 )
 
 
 @pytest.fixture(scope="module", autouse=True)
-def disable_numba_jit():
+def disable_numba_jit() -> Generator[None, None, None]:
     # Save original state
     orig_disable_jit = numba.config.DISABLE_JIT
     # Disable JIT

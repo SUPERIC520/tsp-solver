@@ -1,7 +1,9 @@
+import multiprocessing as mp
+from typing import cast
+
 import numpy as np
 from numba import njit
-from typing import Tuple, cast
-import multiprocessing as mp
+
 from src.config import NUM_PROCESSES_SEEDING
 
 
@@ -11,8 +13,8 @@ def _greedy_nn_tour(
     candidate_set: np.ndarray,
     start: int,
 ) -> np.ndarray:
-    """
-    Build a greedy nearest-neighbor tour starting from `start`.
+    """Build a greedy nearest-neighbor tour starting from `start`.
+
     Uses the candidate set for O(N*k) construction instead of O(N^2).
     Falls back to a linear scan for any node not reachable via candidates.
     """
@@ -58,17 +60,16 @@ def _greedy_nn_tour(
     return tour
 
 
-def _greedy_nn_worker(args: Tuple[np.ndarray, np.ndarray, int]) -> np.ndarray:
-    """
-    Worker function for parallel greedy NN seed generation.
-    """
+def _greedy_nn_worker(args: tuple[np.ndarray, np.ndarray, int]) -> np.ndarray:
+    """Worker function for parallel greedy NN seed generation."""
     coords, candidate_set, start_node = args
-    return cast(np.ndarray, _greedy_nn_tour(coords, candidate_set, int(start_node)))
+    return cast("np.ndarray", _greedy_nn_tour(coords, candidate_set, int(start_node)))
 
 
 def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
-    """
-    Ensure the numpy array is C-contiguous and its data pointer is aligned to the specified byte boundary.
+    """Ensure the numpy array is C-contiguous and aligned.
+
+    Data pointer is aligned to the specified byte boundary.
     If already aligned and contiguous, returns the array.
     Otherwise, creates a new aligned array and copies the data.
     """
@@ -90,8 +91,6 @@ def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
     aligned_arr = aligned_raw.view(dtype).reshape(shape)
     np.copyto(aligned_arr, arr)
 
-    assert aligned_arr.ctypes.data % alignment == 0
-    assert aligned_arr.flags['C_CONTIGUOUS']
     return aligned_arr
 
 
@@ -113,14 +112,16 @@ def _rotate_tour_jit(tour: np.ndarray, start_idx: int) -> np.ndarray:
 
 
 def rotate_tour(tour: np.ndarray, start_node: int) -> np.ndarray:
-    """
-    Rotate starting node sequence while keeping the path cycle topology unchanged.
+    """Rotate starting node sequence.
+
+    Keeps the path cycle topology unchanged.
     Ensure the output array is C-contiguous and 64-byte aligned.
     """
     tour = np.ascontiguousarray(tour, dtype=np.int32)
     start_idx = _find_index_jit(tour, start_node)
     if start_idx == -1:
-        raise ValueError(f"start_node {start_node} not found in tour")
+        msg = f"start_node {start_node} not found in tour"
+        raise ValueError(msg)
 
     rotated = _rotate_tour_jit(tour, start_idx)
     return ensure_alignment(rotated, alignment=64)
@@ -132,8 +133,9 @@ def generate_greedy_nn_seeds(
     num_seeds: int = 1,
     start_nodes: np.ndarray | None = None,
 ) -> np.ndarray:
-    """
-    Generate greedy nearest-neighbor seeds from diverse starting cities in parallel.
+    """Generate greedy nearest-neighbor seeds in parallel.
+
+    Diverse starting cities are used.
     Uses multiprocessing.Pool (bounded by NUM_PROCESSES_SEEDING).
     Returns a 64-byte aligned contiguous matrix of shape (num_seeds, N).
     """
@@ -147,9 +149,12 @@ def generate_greedy_nn_seeds(
         # Space starting nodes evenly across the tour
         step = max(1, n // num_seeds)
         start_nodes = np.array([i * step for i in range(num_seeds)], dtype=np.int32)
-    else:
-        if start_nodes.shape[0] != num_seeds:
-            raise ValueError(f"start_nodes length {start_nodes.shape[0]} does not match num_seeds {num_seeds}")
+    elif start_nodes.shape[0] != num_seeds:
+        msg = (
+            f"start_nodes length {start_nodes.shape[0]} "
+            f"does not match num_seeds {num_seeds}"
+        )
+        raise ValueError(msg)
 
     # Determine process count
     num_procs = NUM_PROCESSES_SEEDING

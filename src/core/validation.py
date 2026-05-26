@@ -1,20 +1,21 @@
+import json
+from pathlib import Path
+
 import numpy as np
 from numba import njit, prange
-from typing import Tuple
-import os
-import json
+
 from src.utils.data_io import load_hk_cache, save_hk_cache
 
 # Project root is two levels up from src/core/validation.py
-_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CACHE_PATH = os.path.join(_root, ".cache", "hk_bounds.json")
+_root = Path(__file__).resolve().parent.parent.parent
+CACHE_PATH = _root / ".cache" / "hk_bounds.json"
 
 
-def load_hk_cache_json(n: int) -> Tuple[float, np.ndarray] | None:
-    if not os.path.exists(CACHE_PATH):
+def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:
+    if not CACHE_PATH.exists():
         return None
     try:
-        with open(CACHE_PATH, "r") as f:
+        with CACHE_PATH.open("r", encoding="utf-8") as f:
             data = json.load(f)
         key = str(n)
         if key in data:
@@ -26,38 +27,33 @@ def load_hk_cache_json(n: int) -> Tuple[float, np.ndarray] | None:
             lb = float(lb_val)
             pi = np.array(entry["pi"], dtype=np.float64)
             return lb, pi
-    except Exception:
+    except (OSError, ValueError, KeyError):
         pass
     return None
 
 
 def save_hk_cache_json(n: int, lb: float, pi: np.ndarray) -> None:
     data = {}
-    if os.path.exists(CACHE_PATH):
+    if CACHE_PATH.exists():
         try:
-            with open(CACHE_PATH, "r") as f:
+            with CACHE_PATH.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception:
+        except (OSError, ValueError):
             pass
-    
-    data[str(n)] = {
-        "lb": lb,
-        "pi": pi.tolist()
-    }
-    
+
+    data[str(n)] = {"lb": lb, "pi": pi.tolist()}
+
     try:
-        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        with open(CACHE_PATH, "w") as f:
+        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with CACHE_PATH.open("w", encoding="utf-8") as f:
             json.dump(data, f)
-    except Exception:
+    except OSError:
         pass
 
 
 @njit(cache=True, fastmath=True)  # type: ignore
 def _get_dist(i: int, j: int, coords: np.ndarray, pi: np.ndarray) -> float:
-    """
-    Get transformed distance: d'(i,j) = d(i,j) + pi[i] + pi[j]
-    """
+    """Get transformed distance: d'(i,j) = d(i,j) + pi[i] + pi[j]."""
     dx = coords[i, 0] - coords[j, 0]
     dy = coords[i, 1] - coords[j, 1]
     return float(np.sqrt(dx * dx + dy * dy) + pi[i] + pi[j])
@@ -85,7 +81,7 @@ def _heap_push(
 @njit(cache=True, fastmath=True)  # type: ignore
 def _heap_pop(
     heap_val: np.ndarray, heap_node: np.ndarray, size: int
-) -> Tuple[float, int, int]:
+) -> tuple[float, int, int]:
     res_d = heap_val[0]
     res_node = heap_node[0]
     size -= 1
@@ -116,7 +112,7 @@ def _heap_pop(
 @njit(cache=True, fastmath=True)  # type: ignore
 def _build_undirected_adj(
     n: int, candidate_set: np.ndarray
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     adj_ptr = np.zeros(n + 1, dtype=np.int32)
     for u in range(n):
         for k in range(candidate_set.shape[1]):
@@ -153,7 +149,7 @@ def compute_mst_weight(
     adj_indices: np.ndarray,
     pi: np.ndarray,
     root: int,
-) -> Tuple[float, np.ndarray, np.ndarray]:
+) -> tuple[float, np.ndarray, np.ndarray]:
     min_dist = np.full(n, np.inf, dtype=np.float64)
     parent = np.full(n, -1, dtype=np.int32)
     visited = np.zeros(n, dtype=np.bool_)
@@ -203,7 +199,7 @@ def _compute_hk_impl(
     max_iter: int,
     initial_pi: np.ndarray,
     target_ub: float,
-) -> Tuple[float, np.ndarray]:
+) -> tuple[float, np.ndarray]:
     n = coords.shape[0]
     coords = np.ascontiguousarray(coords)
     candidate_set = np.ascontiguousarray(candidate_set)
@@ -284,7 +280,7 @@ def compute_hk_lower_bound(
     initial_pi: np.ndarray | None = None,
     target_ub: float = np.inf,
     sample_name: str | None = None,
-) -> Tuple[float, np.ndarray]:
+) -> tuple[float, np.ndarray]:
     n = coords.shape[0]
     cached_json = load_hk_cache_json(n)
     if cached_json is not None:
@@ -321,7 +317,7 @@ def compute_alpha_values(
     pi = np.ascontiguousarray(pi)
     adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
     root = 0
-    mst_weight, degrees, parent = compute_mst_weight(
+    _mst_weight, _degrees, parent = compute_mst_weight(
         n, coords, adj_ptr, adj_indices, pi, root
     )
     d1, d2 = np.inf, np.inf
@@ -386,10 +382,10 @@ def compute_alpha_values(
             if up[i, j - 1] != -1:
                 up[i, j] = up[up[i, j - 1], j - 1]
                 max_edge[i, j] = max(max_edge[i, j - 1], max_edge[up[i, j - 1], j - 1])
-    
+
     num_cands = candidate_set.shape[1]
     alphas = np.full((n, num_cands), np.inf, dtype=np.float64)
-    
+
     # We use explicit integer types to avoid Numba parallel inference issues
     for node_i in prange(n):
         u_idx = np.int32(node_i)
@@ -397,11 +393,11 @@ def compute_alpha_values(
             v_node = candidate_set[u_idx, cand_k]
             if v_node == -1:
                 break
-            
+
             v_idx = np.int32(v_node)
-            if u_idx == root or v_idx == root:
+            if root in (u_idx, v_idx):
                 val_other = v_idx if u_idx == root else u_idx
-                if val_other == n1 or val_other == n2:
+                if val_other in (n1, n2):
                     alphas[u_idx, cand_k] = 0.0
                 else:
                     alphas[u_idx, cand_k] = _get_dist(root, val_other, coords, pi) - d2
@@ -410,14 +406,14 @@ def compute_alpha_values(
                 curr_v = v_idx
                 if depth[curr_u] < depth[curr_v]:
                     curr_u, curr_v = curr_v, curr_u
-                
+
                 max_e = -1e15
                 diff = depth[curr_u] - depth[curr_v]
                 for lca_step in range(log_n):
                     if (diff >> lca_step) & 1:
                         max_e = max(max_e, max_edge[curr_u, lca_step])
                         curr_u = up[curr_u, lca_step]
-                
+
                 if curr_u != curr_v:
                     for lca_step in range(log_n - 1, -1, -1):
                         if up[curr_u, lca_step] != up[curr_v, lca_step]:
@@ -427,7 +423,7 @@ def compute_alpha_values(
                             curr_v = up[curr_v, lca_step]
                     max_e = max(max_e, max_edge[curr_u, 0])
                     max_e = max(max_e, max_edge[curr_v, 0])
-                
+
                 alphas[u_idx, cand_k] = _get_dist(u_idx, v_idx, coords, pi) - max_e
     return alphas
 

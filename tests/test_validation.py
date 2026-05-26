@@ -1,6 +1,7 @@
 import numpy as np
-from src.core.validation import compute_hk_lower_bound, validate_result
+
 from src.core.preprocessing import build_candidate_sets
+from src.core.validation import compute_hk_lower_bound, validate_result
 
 
 def test_compute_hk_lower_bound_square() -> None:
@@ -10,7 +11,7 @@ def test_compute_hk_lower_bound_square() -> None:
     )
 
     candidate_set = build_candidate_sets(coords, k=3)
-    lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=50)
+    lb, _pi = compute_hk_lower_bound(coords, candidate_set, max_iter=50)
 
     # Lower bound for square should be close to 4.0
     assert lb > 3.9
@@ -23,7 +24,10 @@ def test_validate_result() -> None:
 
 
 def test_hk_lower_bound_small() -> None:
-    """T6.4: Run HK on a tiny coord set (N=5), verify lb > 0 and pi has correct shape."""
+    """T6.4: Run HK on a tiny coord set (N=5).
+
+    Verify lb > 0 and pi has correct shape.
+    """
     coords = np.array(
         [
             [0.0, 0.0],
@@ -51,7 +55,7 @@ def test_alpha_values_shape() -> None:
     coords = np.random.rand(n, 2).astype(np.float64)
     candidate_set = build_candidate_sets(coords, k=k)
 
-    lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=100)
+    _lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=100)
     alphas = compute_alpha_values(n, coords, candidate_set, pi)
 
     assert isinstance(alphas, np.ndarray)
@@ -86,7 +90,7 @@ def test_hk_bound_precision_and_cache() -> None:
     assert lb > 0.0
     assert pi.shape == (6,)
 
-    from src.core.validation import save_hk_cache_json, load_hk_cache_json
+    from src.core.validation import load_hk_cache_json, save_hk_cache_json
 
     dummy_n = 9999
     dummy_lb = 42.42
@@ -108,11 +112,12 @@ def test_hk_bound_precision_and_cache() -> None:
 
     # Clean up dummy entry
     import json
+
     from src.core.validation import CACHE_PATH
 
     if os.path.exists(CACHE_PATH):
         try:
-            with open(CACHE_PATH, "r") as f:
+            with open(CACHE_PATH) as f:
                 data = json.load(f)
             if str(dummy_n) in data:
                 del data[str(dummy_n)]
@@ -128,7 +133,7 @@ def test_compute_alpha_values_dimensions_and_shape() -> None:
     coords = np.random.rand(10, 2).astype(np.float64)
     candidate_set = build_candidate_sets(coords, k=5)
 
-    lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=50)
+    _lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=50)
 
     from src.core.validation import compute_alpha_values
 

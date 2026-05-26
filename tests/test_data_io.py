@@ -1,8 +1,10 @@
 import os
 from typing import Any
+
 import numpy as np
-from src.utils.data_io import load_cities, save_tour, load_tour
+
 from src.core.kopt_engine import compute_tour_length
+from src.utils.data_io import load_cities, load_tour, save_tour
 
 
 def test_load_cities() -> None:

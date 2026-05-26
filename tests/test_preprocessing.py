@@ -1,5 +1,4 @@
-"""
-Tests for src/core/preprocessing.py.
+"""Tests for src/core/preprocessing.py.
 
 Covers:
   - ensure_alignment: alignment guarantee, C-contiguity, data preservation
@@ -16,7 +15,6 @@ from src.core.preprocessing import (
     hilbert_reorder_cities,
     refine_candidate_set_with_alpha,
 )
-
 
 # ---------------------------------------------------------------------------
 # ensure_alignment
@@ -162,7 +160,7 @@ def test_build_candidate_sets_simple_square() -> None:
 
 
 def test_build_candidate_sets_grid_center() -> None:
-    """3×3 grid: centre node's 4-NN should be its 4 cardinal neighbours."""
+    """3x3 grid: centre node's 4-NN should be its 4 cardinal neighbours."""
     x = np.linspace(0, 2, 3)
     y = np.linspace(0, 2, 3)
     xv, yv = np.meshgrid(x, y)
@@ -175,7 +173,7 @@ def test_build_candidate_sets_grid_center() -> None:
 
 
 def test_build_candidate_sets_10_cities() -> None:
-    """2×5 grid: verify specific neighbours for two nodes."""
+    """2x5 grid: verify specific neighbours for two nodes."""
     coords_list = [[float(x), float(y)] for y in range(2) for x in range(5)]
     coords = np.array(coords_list, dtype=np.float64)
 
@@ -190,7 +188,9 @@ def test_build_candidate_sets_10_cities() -> None:
 
 def test_build_candidate_sets_fewer_cities_than_k() -> None:
     """When N < k the surplus columns must be filled with -1."""
-    coords = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [10.0, 10.0]], dtype=np.float64)
+    coords = np.array(
+        [[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [10.0, 10.0]], dtype=np.float64
+    )
     c_set = build_candidate_sets(coords, k=64)
 
     assert c_set.shape == (4, 64)

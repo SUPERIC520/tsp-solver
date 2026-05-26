@@ -1,11 +1,12 @@
 import numpy as np
-from src.core.validation import (
-    compute_hk_lower_bound,
-    compute_alpha_values,
-    compute_mst_weight,
-    _build_undirected_adj,
-)
+
 from src.core.preprocessing import build_candidate_sets, refine_candidate_set_with_alpha
+from src.core.validation import (
+    _build_undirected_adj,
+    compute_alpha_values,
+    compute_hk_lower_bound,
+    compute_mst_weight,
+)
 
 
 def test_hk_pi_extraction() -> None:
@@ -27,7 +28,7 @@ def test_alpha_calculation() -> None:
     n = 10
     candidate_set = build_candidate_sets(coords, k=5)
 
-    lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=20)
+    _lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=20)
     alphas = compute_alpha_values(n, coords, candidate_set, pi)
 
     assert alphas.shape == candidate_set.shape
@@ -65,7 +66,7 @@ def test_refine_candidate_set() -> None:
     n = 50
     candidate_set = build_candidate_sets(coords, k=10)
 
-    lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=20)
+    _lb, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=20)
     refined_set = refine_candidate_set_with_alpha(coords, candidate_set, pi, top_k=10)
 
     assert refined_set.shape == candidate_set.shape
@@ -100,4 +101,3 @@ if __name__ == "__main__":
     test_hk_pi_extraction()
     test_alpha_calculation()
     test_refine_candidate_set()
-    print("All advanced feature tests passed!")

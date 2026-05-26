@@ -1,8 +1,11 @@
 import multiprocessing as mp
-import numpy as np
-import time
 import sys
-from typing import Tuple, List, Any
+import time
+from typing import Any, NoReturn
+
+import numpy as np
+
+from src.config import NUM_PROCESSES_SOLVER
 from src.core.kopt_engine import cascading_kopt_optimize as kopt_optimize_tour
 from src.utils.time_utils import format_duration
 
@@ -10,35 +13,52 @@ from src.utils.time_utils import format_duration
 _shared_progress_array: Any = None
 
 
-def _init_worker(progress_array: Any) -> None:
-    """
-    Initializer for worker processes. Sets the shared progress array.
-    """
-    global _shared_progress_array
+def _init_worker(progress_array: Any) -> None:  # noqa: ANN401
+    """Initializer for worker processes. Sets the shared progress array."""
+    global _shared_progress_array  # noqa: PLW0603
     _shared_progress_array = progress_array
 
 
 def _kopt_worker(
-    args: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, float, int],
-) -> Tuple[np.ndarray, float, int] | Exception:
-    """
-    Worker function for multiprocessing. Returns (tour, length, kicks_completed)
+    args: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, float, int],
+) -> tuple[np.ndarray, float, int] | Exception:
+    """Worker function for multiprocessing.
+
+    Returns (tour, length, kicks_completed)
     or catches exceptions and returns the exception object.
     """
     try:
-        seed, coords_x, coords_y, candidate_set, num_kicks, max_opt, time_limit_s, seed_idx = args
-        
-        global _shared_progress_array
-        
-        res = kopt_optimize_tour(
-            seed, coords_x, coords_y, candidate_set, num_kicks, max_opt,
+        (
+            seed,
+            coords_x,
+            coords_y,
+            candidate_set,
+            num_kicks,
+            max_opt,
+            time_limit_s,
+            seed_idx,
+        ) = args
+
+        global _shared_progress_array  # noqa: PLW0602
+
+        return kopt_optimize_tour(
+            seed,
+            coords_x,
+            coords_y,
+            candidate_set,
+            num_kicks,
+            max_opt,
             time_limit_s=time_limit_s,
             progress_array=_shared_progress_array,
             seed_idx=seed_idx,
         )
-        return res
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return e
+
+
+def _raise_exception(e: Exception) -> NoReturn:
+    """Helper to abstract raise for TRY301."""
+    raise e
 
 
 def parallel_solve(
@@ -51,13 +71,11 @@ def parallel_solve(
     time_limit_s: float = -1.0,
     iteration_start_time: float = 0.0,
     total_start_time: float = 0.0,
-) -> List[Tuple[np.ndarray, float]]:
-    """
-    Run K-Opt optimization in parallel for multiple seeds.
+) -> list[tuple[np.ndarray, float]]:
+    """Run K-Opt optimization in parallel for multiple seeds.
+
     Uses multiprocessing.Array for low-overhead progress tracking.
     """
-    from src.config import NUM_PROCESSES_SOLVER
-
     p_count = num_processes
     if p_count == -1:
         p_count = NUM_PROCESSES_SOLVER
@@ -68,19 +86,27 @@ def parallel_solve(
     coords_y = np.ascontiguousarray(coords[:, 1], dtype=np.float64)
 
     num_seeds = seeds.shape[0]
-    
+
     # [T5.1] Shared memory counter array
-    progress_array = mp.Array('i', num_seeds)
+    progress_array = mp.Array("i", num_seeds)
 
     # Disable inter-process tour synchronization to prevent locks.
     # Distribute slice seeds and the progress Array.
-    tasks = []
-    for i in range(num_seeds):
-        tasks.append(
-            (seeds[i], coords_x, coords_y, candidate_set, num_kicks, max_opt, time_limit_s, i)
+    tasks = [
+        (
+            seeds[i],
+            coords_x,
+            coords_y,
+            candidate_set,
+            num_kicks,
+            max_opt,
+            time_limit_s,
+            i,
         )
+        for i in range(num_seeds)
+    ]
 
-    results = []
+    results: list[tuple[np.ndarray, float]] = []
     completed = [False] * num_seeds
     start_time = time.time()
 
@@ -99,7 +125,6 @@ def parallel_solve(
             # Check elapsed time for timeout
             if time_limit_s > 0 and (time.time() - start_time) > time_limit_s:
                 sys.stdout.write("\r" + " " * 120 + "\r")
-                print(f"    [Timeout] limit of {time_limit_s}s exceeded. Terminating workers...", file=sys.stderr)
                 pool.terminate()
                 pool.join()
                 break
@@ -108,26 +133,34 @@ def parallel_solve(
                 if not completed[i] and res.ready():
                     result = res.get()
                     if isinstance(result, Exception):
-                        raise result
-                    
-                    # result is (tour, length, kicks_completed)
+                        _raise_exception(result)
+
                     results.append((result[0], result[1]))
                     completed[i] = True
                     sys.stdout.write("\r" + " " * 120 + "\r")
-                    print(f"  - Completed seed {len(results)}/{num_seeds} (Length: {result[1]:.2f})")
 
             if not all(completed):
                 time.sleep(0.1)
-                
+
                 # Real-time progress reporting (T5.1)
                 total_kicks_done = sum(progress_array[:])
                 total_kicks_target = num_seeds * num_kicks
-                percent = (total_kicks_done / total_kicks_target) * 100 if total_kicks_target > 0 else 0.0
+                percent = (
+                    (total_kicks_done / total_kicks_target) * 100
+                    if total_kicks_target > 0
+                    else 0.0
+                )
 
                 done = sum(completed)
                 iter_elapsed = time.time() - iteration_start_time
                 total_elapsed = time.time() - total_start_time
-                status = f"\r    [Progress] {done}/{num_seeds} seeds solved | kicks: {total_kicks_done}/{total_kicks_target} ({percent:.2f}%) | Iter Elapsed: {format_duration(iter_elapsed)} | Total Elapsed: {format_duration(total_elapsed)} ..."
+                status = (
+                    f"\r    [Progress] {done}/{num_seeds} seeds solved | "
+                    f"kicks: {total_kicks_done}/{total_kicks_target} "
+                    f"({percent:.2f}%) | "
+                    f"Iter Elapsed: {format_duration(iter_elapsed)} | "
+                    f"Total Elapsed: {format_duration(total_elapsed)} ..."
+                )
                 # Append padding spaces to the status line itself to clear any remnants
                 sys.stdout.write(status.ljust(120))
                 sys.stdout.flush()
@@ -135,8 +168,7 @@ def parallel_solve(
         pool.close()
         pool.join()
 
-    except Exception as e:
-        print(f"\n    [Exception] Encountered exception in orchestration: {e}. Terminating workers...", file=sys.stderr)
+    except Exception:  # noqa: BLE001
         pool.terminate()
         pool.join()
         # Return best intermediate results collected so far

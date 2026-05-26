@@ -1,12 +1,13 @@
+import numba
 import numpy as np
 import pytest
-import numba
-from src.core.seed_generation import (
-    rotate_tour,
-    generate_greedy_nn_seeds,
-    ensure_alignment,
-)
+
 from src.core.preprocessing import build_candidate_sets
+from src.core.seed_generation import (
+    ensure_alignment,
+    generate_greedy_nn_seeds,
+    rotate_tour,
+)
 
 
 def test_ensure_alignment() -> None:
@@ -91,7 +92,7 @@ def test_generate_greedy_nn_seeds() -> None:
         assert np.min(seeds[i]) == 0
         assert np.max(seeds[i]) == 4
 
-        # Verify coordinate mapping correctness (every seed mapped to coordinates is valid)
+        # Verify coordinate mapping correctness (every seed mapped is valid)
         mapped_coords = coords[seeds[i]]
         assert mapped_coords.shape == (5, 2)
         assert mapped_coords.dtype == np.float64
@@ -112,16 +113,22 @@ def test_generate_greedy_nn_seeds() -> None:
 
     # Error case: length of start_nodes mismatch
     with pytest.raises(ValueError, match="does not match num_seeds"):
-        generate_greedy_nn_seeds(coords, candidate_set, num_seeds=3, start_nodes=start_nodes)
+        generate_greedy_nn_seeds(
+            coords, candidate_set, num_seeds=3, start_nodes=start_nodes
+        )
 
 
 def test_under_disabled_jit() -> None:
-    """
-    Test functionality specifically with JIT disabled to ensure the pure-Python
-    implementation is robust.
+    """Test functionality specifically with JIT disabled.
+
+    Ensures the pure-Python implementation is robust.
     """
     # 1. Test rotate_tour using the uncompiled py_func internally
-    from src.core.seed_generation import _find_index_jit, _rotate_tour_jit, _greedy_nn_tour
+    from src.core.seed_generation import (
+        _find_index_jit,
+        _greedy_nn_tour,
+        _rotate_tour_jit,
+    )
 
     tour = np.array([5, 2, 7, 1], dtype=np.int32)
     idx = _find_index_jit.py_func(tour, 7)

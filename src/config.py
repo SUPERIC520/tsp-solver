@@ -1,19 +1,22 @@
-"""
-Global configuration constants for the TSP solver.
-"""
+"""Global configuration constants for the TSP solver."""
 
-import os
+
+from pathlib import Path
+
 
 def _get_cache_version() -> str:
+    git_head = Path(".git/HEAD")
+    if not git_head.exists():
+        return "default"
     try:
-        with open('.git/HEAD', 'r') as f:
+        with git_head.open("r", encoding="utf-8") as f:
             ref = f.read().strip()
-            if ref.startswith('ref: '):
-                branch = ref.split('refs/heads/')[-1]
-                return branch.replace('/', '_')
+            if ref.startswith("ref: "):
+                branch = ref.split("refs/heads/")[-1]
+                return branch.replace("/", "_")
             return ref[:7]
-    except Exception:
-        return 'default'
+    except (OSError, IndexError):
+        return "default"
 
 # Cache version for generated artifacts (e.g. .npy bounds).
 CACHE_VERSION: str = _get_cache_version()

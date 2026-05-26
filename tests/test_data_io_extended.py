@@ -1,15 +1,15 @@
-"""
-Extended tests for the Data I/O module.
-"""
+"""Extended tests for the Data I/O module."""
 
 from pathlib import Path
+
 import numpy as np
+
 from src.utils.data_io import (
-    save_solution_csv,
-    load_best_length_from_csv,
     get_hk_cache_paths,
+    load_best_length_from_csv,
     load_hk_cache,
     save_hk_cache,
+    save_solution_csv,
 )
 from src.utils.persistence import update_best_tour
 
@@ -107,7 +107,8 @@ def test_update_best_tour(tmp_path: Path) -> None:
     assert update_best_tour(filepath, tour2, length3, is_full_run=True)
     assert np.isclose(load_best_length_from_csv(filepath), length3)
 
-    # 3d. Gate with is_full_run=False even with better length (should return False and NOT update)
+    # 3d. Gate with is_full_run=False even with better length
+    # (should return False and NOT update)
     length4 = 130.0
     assert not update_best_tour(filepath, tour1, length4, is_full_run=False)
     assert np.isclose(load_best_length_from_csv(filepath), length3)
