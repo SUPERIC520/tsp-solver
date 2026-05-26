@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import csv
 
 
 def load_cities(filepath: str) -> np.ndarray:
@@ -26,6 +27,43 @@ def save_solution_csv(filepath: str, tour: np.ndarray, length: float) -> None:
         # Joining indices with commas for CSV format
         indices_str = ",".join(map(str, tour))
         f.write(f"indices,{indices_str}\n")
+
+
+def load_best_length_from_csv(filepath: str) -> float:
+    """
+    Reads a CSV file and parses the best length.
+    Returns np.inf if the file is missing or corrupt.
+    Supports:
+    1. Custom format:
+       length,L
+       indices,I1,I2...
+    2. Pandas format:
+       tour,length
+       "I1,I2...",L
+    """
+    if not os.path.exists(filepath):
+        return float("inf")
+    try:
+        with open(filepath, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            row1 = next(reader, None)
+            if row1 is None or len(row1) < 2:
+                return float("inf")
+            
+            # Format 1: length,L
+            if row1[0] == "length":
+                return float(row1[1])
+            
+            # Format 2: tour,length
+            if "length" in row1:
+                idx = row1.index("length")
+                row2 = next(reader, None)
+                if row2 is not None and len(row2) > idx:
+                    return float(row2[idx])
+            
+            return float("inf")
+    except Exception:
+        return float("inf")
 
 
 def save_tour(filepath: str, tour: np.ndarray, length: float) -> None:

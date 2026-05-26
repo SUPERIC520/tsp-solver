@@ -11,6 +11,7 @@ from src.utils.data_io import (
     load_hk_cache,
     save_hk_cache,
 )
+from src.utils.persistence import update_best_tour
 
 
 def test_save_solution_csv_and_load_best_length(tmp_path: Path) -> None:
@@ -73,3 +74,40 @@ def test_hk_cache() -> None:
         # Clean up
         bound_path.unlink(missing_ok=True)
         pi_path.unlink(missing_ok=True)
+
+
+def test_update_best_tour(tmp_path: Path) -> None:
+    """Test updating the best tour and its checks."""
+    filepath = str(tmp_path / "best_tour.csv")
+    tour1 = np.array([0, 1, 2, 3, 4], dtype=np.int32)
+    length1 = 150.0
+
+    # 1. Test when is_full_run is False (should not write to disk, returns False)
+    assert not update_best_tour(filepath, tour1, length1, is_full_run=False)
+    assert not Path(filepath).exists()
+
+    # 2. Test initial write with is_full_run=True (should write to disk, returns True)
+    assert update_best_tour(filepath, tour1, length1, is_full_run=True)
+    assert Path(filepath).exists()
+    assert np.isclose(load_best_length_from_csv(filepath), length1)
+
+    # 3. Test check for global improvement (new_length < current_best)
+    # 3a. Worse length (should return False and NOT update file)
+    tour2 = np.array([0, 2, 1, 4, 3], dtype=np.int32)
+    length2 = 160.0
+    assert not update_best_tour(filepath, tour2, length2, is_full_run=True)
+    assert np.isclose(load_best_length_from_csv(filepath), length1)
+
+    # 3b. Equal length (should return False and NOT update file)
+    assert not update_best_tour(filepath, tour2, length1, is_full_run=True)
+    assert np.isclose(load_best_length_from_csv(filepath), length1)
+
+    # 3c. Better length (should return True and update file)
+    length3 = 140.0
+    assert update_best_tour(filepath, tour2, length3, is_full_run=True)
+    assert np.isclose(load_best_length_from_csv(filepath), length3)
+
+    # 3d. Gate with is_full_run=False even with better length (should return False and NOT update)
+    length4 = 130.0
+    assert not update_best_tour(filepath, tour1, length4, is_full_run=False)
+    assert np.isclose(load_best_length_from_csv(filepath), length3)

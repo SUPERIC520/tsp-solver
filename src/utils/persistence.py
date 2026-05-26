@@ -1,25 +1,25 @@
-import pandas as pd
+import csv
 import numpy as np
 import os
+from src.utils.data_io import load_best_length_from_csv
 
-def update_best_tour(best_tour_file: str, new_tour: np.ndarray, new_length: float):
-    # If the file doesn't exist, create it with the new tour
-    # If it exists, read it, compare, and update if better
-    
-    # We'll save with columns ['tour', 'length']
-    # 'tour' will be a string representation of the array
-    
-    tour_str = ",".join(map(str, new_tour.tolist()))
-    new_data = pd.DataFrame({'tour': [tour_str], 'length': [new_length]})
-    
-    if os.path.exists(best_tour_file):
-        df = pd.read_csv(best_tour_file)
-        if not df.empty:
-            current_best = df.iloc[0]['length']
-            if new_length < current_best:
-                new_data.to_csv(best_tour_file, index=False)
-                return True
-            return False
-    
-    new_data.to_csv(best_tour_file, index=False)
-    return True
+def update_best_tour(best_tour_file: str, new_tour: np.ndarray, new_length: float, is_full_run: bool = True) -> bool:
+    """
+    Updates the optimal tour on disk if length is a global improvement.
+    Skipped if is_full_run is False to prevent overwriting global solutions with sub-scale test runs.
+    """
+    if not is_full_run:
+        return False
+        
+    current_best = load_best_length_from_csv(best_tour_file)
+    if new_length < current_best:
+        if os.path.dirname(best_tour_file):
+            os.makedirs(os.path.dirname(best_tour_file), exist_ok=True)
+        tour_str = ",".join(map(str, new_tour.tolist()))
+        with open(best_tour_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["tour", "length"])
+            writer.writerow([tour_str, str(new_length)])
+        return True
+        
+    return False

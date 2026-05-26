@@ -49,10 +49,10 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [ ] [T6.3] Implement JIT-parallel Alpha value estimation.
   - [ ] [T6.4] Implement validation unit tests.
 
-- [ ] **Data I/O & Persistence Module** (Details: [data-io.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/data-io.md))
-  - [ ] [T7.1] Implement CSV tour length loading `load_best_length_from_csv`.
-  - [ ] [T7.2] Restructure `update_best_tour` with `is_full_run` conditional checks.
-  - [ ] [T7.3] Fix and run I/O verification unit tests.
+- [x] **Data I/O & Persistence Module** (Details: [data-io.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/data-io.md))
+  - [x] [T7.1] Implement CSV tour length loading `load_best_length_from_csv`.
+  - [x] [T7.2] Restructure `update_best_tour` with `is_full_run` conditional checks.
+  - [x] [T7.3] Fix and run I/O verification unit tests.
 
 - [ ] **Main Pipeline & Integration Module** (Details: [main.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/main.md))
   - [ ] [T8.1] Connect all refactored parts inside main entry script.
