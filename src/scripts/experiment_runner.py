@@ -15,8 +15,7 @@ import argparse
 import threading
 import numpy as np
 import scipy.stats as stats
-import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import Tuple, List, Dict, Any, Optional
 
 from src.utils.data_io import load_cities
@@ -376,7 +375,7 @@ def main() -> None:
             writer = csv.writer(f)
             writer.writerow(["config_id", "config_name", "trial_idx", "length", "runtime", "gap_pct"])
 
-    print(f"TSP Experiment Runner")
+    print("TSP Experiment Runner")
     print(f"  N={n} | seeds={num_seeds} | workers/trial={num_workers} | concurrent configs={concurrent}")
     print(f"  Initial Seed Test : {trials_init} trials, kicks={kicks_init}, iters=1")
     print(f"  Re-seeding Test   : {trials_reseed} trials, kicks={kicks_reseed}, iters={iters_reseed}")

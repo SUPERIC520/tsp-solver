@@ -5,9 +5,6 @@ os.environ['NUMBA_CACHE_DIR'] = ''
 
 from src.core.kopt_engine import (
     _optimize_2opt,
-    _optimize_or_opt,
-    _optimize_3opt_sequential,
-    _cascading_kopt_inner,
     compute_tour_length,
     _dist
 )

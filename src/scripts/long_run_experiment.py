@@ -8,7 +8,6 @@ Focuses only on 100% Random vs 100% Greedy NN.
 
 import argparse
 import csv
-import json
 import os
 import time
 import threading
@@ -22,7 +21,6 @@ from src.utils.data_io import load_cities
 from src.core.preprocessing import hilbert_reorder_cities, build_candidate_sets, refine_candidate_set_with_alpha
 from src.core.orchestration import parallel_solve
 from src.core.seed_generation import (
-    generate_hilbert_seeds,
     generate_random_seeds,
     generate_greedy_nn_seeds,
 )

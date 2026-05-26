@@ -98,7 +98,7 @@ def parallel_solve(
         while not all(completed):
             # Check elapsed time for timeout
             if time_limit_s > 0 and (time.time() - start_time) > time_limit_s:
-                sys.stdout.write("\r" + " " * 100 + "\r")
+                sys.stdout.write("\r" + " " * 120 + "\r")
                 print(f"    [Timeout] limit of {time_limit_s}s exceeded. Terminating workers...", file=sys.stderr)
                 pool.terminate()
                 pool.join()
@@ -113,7 +113,7 @@ def parallel_solve(
                     # result is (tour, length, kicks_completed)
                     results.append((result[0], result[1]))
                     completed[i] = True
-                    sys.stdout.write("\r" + " " * 100 + "\r")
+                    sys.stdout.write("\r" + " " * 120 + "\r")
                     print(f"  - Completed seed {len(results)}/{num_seeds} (Length: {result[1]:.2f})")
 
             if not all(completed):
@@ -128,7 +128,8 @@ def parallel_solve(
                 iter_elapsed = time.time() - iteration_start_time
                 total_elapsed = time.time() - total_start_time
                 status = f"\r    [Progress] {done}/{num_seeds} seeds solved | kicks: {total_kicks_done}/{total_kicks_target} ({percent:.2f}%) | Iter Elapsed: {format_duration(iter_elapsed)} | Total Elapsed: {format_duration(total_elapsed)} ..."
-                sys.stdout.write(status)
+                # Append padding spaces to the status line itself to clear any remnants
+                sys.stdout.write(status.ljust(120))
                 sys.stdout.flush()
 
         pool.close()

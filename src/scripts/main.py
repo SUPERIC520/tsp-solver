@@ -170,7 +170,9 @@ def main() -> None:
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
             global_best_tour_new = iter_best_tour.copy() if iter_best_tour is not None else None
-            print(f"  - Found new best length: {global_best_length:.2f}")
+            
+            gap = validate_result(global_best_length, lb_val)
+            print(f"  - Found new best length: {global_best_length:.2f} (Gap: {gap:.4f}%, LB: {lb_val:.2f})")
             
             # Save intermediate result
             if global_best_tour_new is not None:
@@ -179,7 +181,8 @@ def main() -> None:
                 if is_full_run:
                     update_best_tour("data/best_tour.csv", temp_best_tour, global_best_length)
         else:
-            print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
+            gap = validate_result(iter_best_length, lb_val)
+            print(f"  - Iteration best: {iter_best_length:.2f} (Gap: {gap:.4f}%)")
             
         # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour for ALL subsequent seeds
         if global_best_tour_new is not None:
