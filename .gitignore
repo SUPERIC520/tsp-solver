@@ -16,12 +16,8 @@ wheels/
 .ruff_cache/
 .antigravitycli/
 
-# Cache and temporary folders
-.cache/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.antigravitycli/
+# Scratch / debug scripts
+scratch/
 
 # Log files
 logs/
