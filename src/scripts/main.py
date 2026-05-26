@@ -13,7 +13,7 @@ from src.core.preprocessing import (
     refine_candidate_set_with_alpha,
     hilbert_reorder_cities,
 )
-from src.core.seed_generation import generate_hilbert_seeds, generate_greedy_nn_seeds
+from src.core.seed_generation import generate_greedy_nn_seeds, rotate_tour
 from src.core.orchestration import parallel_solve
 from src.core.validation import compute_hk_lower_bound, validate_result
 
@@ -37,13 +37,11 @@ def main() -> None:
     parser.add_argument("--kicks", type=int, default=25000, help="Number of kicks per seed")
     parser.add_argument("--iters", type=int, default=1, help="Number of full iterations (0 for infinite)")
     parser.add_argument("--seeds", type=int, default=8, help="Total number of seeds")
-    parser.add_argument("--greedy_seeds", type=int, default=4, help="Number of greedy NN seeds")
     parser.add_argument("--max_opt", type=int, default=3, help="Max k for k-opt (3 is standard successful config)")
     parser.add_argument("--n", type=int, default=0, help="Number of cities to subset (0 for all)")
     parser.add_argument("--hk_iter", type=int, default=10000, help="HK lower bound iterations")
     parser.add_argument("--no_cache", action="store_true", help="Disable using cached HK bounds")
     parser.add_argument("--start_tour", type=str, default=None, help="Path to an existing tour file to start from")
-    parser.add_argument("--no_diversify", action="store_true", help="Disable 50/50 diversification re-seeding")
     args = parser.parse_args()
 
     start_total = time.time()
@@ -116,8 +114,7 @@ def main() -> None:
     print(f"  - Refinement to top 40 done in {dt:.2f}s.")
 
     # 3. Seed Generation
-    num_hilbert = args.seeds - args.greedy_seeds
-    print(f"[Step 5] Generating {num_hilbert} Hilbert + {args.greedy_seeds} greedy-NN seeds...")
+    print(f"[Step 5] Generating {args.seeds} seeds...")
     t0 = time.time()
     
     if args.start_tour:
@@ -125,17 +122,19 @@ def main() -> None:
         start_tour_indices, _ = load_tour(args.start_tour)
         # Map tour to new order
         start_tour_new = orig_to_new[start_tour_indices]
-        seeds = np.tile(start_tour_new, (args.seeds, 1))
+        
+        # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour
+        seeds = np.empty((args.seeds, n), dtype=np.int32)
+        step = max(1, n // args.seeds)
+        for i in range(args.seeds):
+            start_node = start_tour_new[i * step % n]
+            seeds[i] = rotate_tour(start_tour_new, start_node)
     else:
-        seeds_list = []
-        if num_hilbert > 0:
-            seeds_list.append(generate_hilbert_seeds(coords, num_seeds=num_hilbert))
-        if args.greedy_seeds > 0:
-            seeds_list.append(generate_greedy_nn_seeds(coords, candidate_set, num_seeds=args.greedy_seeds))
-        seeds = np.vstack(seeds_list) if len(seeds_list) > 1 else seeds_list[0]
+        # Initial seeds are all Greedy NN from different starting points
+        seeds = generate_greedy_nn_seeds(coords, candidate_set, num_seeds=args.seeds)
     
     dt = time.time() - t0
-    print(f"  - Seeds generated/loaded in {dt:.2f}s.")
+    print(f"  - Seeds generated in {dt:.2f}s.")
 
     # 4. Optimization
     print(f"[Step 6] Parallel optimization (kicks={args.kicks}, max_opt={args.max_opt}, iters={args.iters})...")
@@ -179,16 +178,6 @@ def main() -> None:
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
             global_best_tour_new = iter_best_tour.copy()
-            
-            if args.no_diversify:
-                seeds = np.tile(global_best_tour_new, (args.seeds, 1))
-            else:
-                # 50% from best, 50% from fresh Hilbert
-                num_keep = args.seeds // 2
-                seeds = np.vstack([
-                    np.tile(global_best_tour_new, (num_keep, 1)),
-                    generate_hilbert_seeds(coords, num_seeds=args.seeds - num_keep)
-                ])
             print(f"  - Found new best length: {global_best_length:.2f}")
             
             # Save intermediate result
@@ -199,15 +188,12 @@ def main() -> None:
         else:
             print(f"  - Iteration best: {iter_best_length:.2f} (No improvement)")
             
-            if args.no_diversify:
-                seeds = np.tile(global_best_tour_new, (args.seeds, 1))
-            else:
-                # 50% from best (to keep local exploration going), 50% fresh Hilbert
-                num_keep = args.seeds // 2
-                seeds = np.vstack([
-                    np.tile(global_best_tour_new, (num_keep, 1)),
-                    generate_hilbert_seeds(coords, num_seeds=args.seeds - num_keep)
-                ])
+        # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour for ALL subsequent seeds
+        if global_best_tour_new is not None:
+            step = max(1, n // args.seeds)
+            for i in range(args.seeds):
+                start_node = global_best_tour_new[i * step % n]
+                seeds[i] = rotate_tour(global_best_tour_new, start_node)
 
     dt_opt = time.time() - start_opt
     print(f"\n  - Optimization completed in {dt_opt:.2f}s.")

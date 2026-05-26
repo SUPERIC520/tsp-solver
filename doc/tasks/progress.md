@@ -54,6 +54,6 @@ This document tracks the overall refactoring progress. Each module contains a ch
   - [x] [T7.2] Restructure `update_best_tour` with `is_full_run` conditional checks.
   - [x] [T7.3] Fix and run I/O verification unit tests.
 
-- [ ] **Main Pipeline & Integration Module** (Details: [main.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/main.md))
-  - [ ] [T8.1] Connect all refactored parts inside main entry script.
-  - [ ] [T8.2] Execute progressive scale checks (N=100 -> 500 -> 1000 -> 5000 -> 115,475) to achieve Gap < 5% and runtime < 10 mins.
+- [x] **Main Pipeline & Integration Module** (Details: [main.md](file:///C:/Users/eric2/Desktop/Classes/Math%20147/TSP_EXP_2/doc/tasks/main.md))
+  - [x] [T8.1] Connect all refactored parts inside main entry script.
+  - [x] [T8.2] Execute progressive scale checks (N=100 -> 500 -> 1000 -> 5000 -> 115,475) to achieve Gap < 5% and runtime < 10 mins.

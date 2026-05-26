@@ -240,6 +240,31 @@ def build_candidate_sets(
     if num_cols_to_copy > 0:
         candidate_set[:, :num_cols_to_copy] = indices[:, 1:query_k].astype(np.int32)
 
+    # Ensure connectivity by adding Hilbert tour edges (i, i-1) and (i, i+1)
+    # Since coordinates are Hilbert-ordered, these are just adjacent indices.
+    for i in range(n):
+        for neighbor in [(i - 1 + n) % n, (i + 1) % n]:
+            if neighbor == i:
+                continue
+            # Check if already in candidate set
+            exists = False
+            for col in range(k):
+                if candidate_set[i, col] == neighbor:
+                    exists = True
+                    break
+                if candidate_set[i, col] == -1:
+                    break
+            
+            if not exists:
+                # Find an empty slot or replace the last one if full
+                for col in range(k):
+                    if candidate_set[i, col] == -1:
+                        candidate_set[i, col] = neighbor
+                        break
+                else:
+                    # Replace the last KD-Tree neighbor if full
+                    candidate_set[i, k - 1] = neighbor
+
     candidate_set = ensure_alignment(
         np.ascontiguousarray(candidate_set), alignment=64
     )
