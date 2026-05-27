@@ -1,3 +1,10 @@
+"""Main entry point for the TSP Solver production run.
+
+This script orchestrates the full TSP solving pipeline, including data loading,
+Hilbert reordering, Held-Karp lower bound computation, candidate set refinement,
+parallel K-Opt optimization, and results persistence.
+"""
+
 import argparse
 import multiprocessing as mp
 import time
@@ -19,6 +26,13 @@ from src.utils.persistence import update_best_tour
 
 
 def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
+    """Save computed Held-Karp lower bound and pi vector to cache.
+
+    Args:
+        n: Number of cities.
+        hk: Computed lower bound.
+        pi: Computed pi vector.
+    """
     cache_dir = Path(f"data/cache/{CACHE_VERSION}")
     hk_file = cache_dir / f"sample_{n}_hk.npy"
     pi_file = cache_dir / f"sample_{n}_pi.npy"
@@ -28,6 +42,7 @@ def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
 
 
 def main() -> None:
+    """Run the main TSP solver optimization loop."""
     parser = argparse.ArgumentParser(description="TSP Solver - Final Production Run")
     parser.add_argument(
         "--kicks", type=int, default=25000, help="Number of kicks per seed"
@@ -65,31 +80,23 @@ def main() -> None:
     start_total = time.time()
 
     # 1. Load Data
-    t0 = time.time()
     coords_orig = load_cities("data/cities.csv")
     if args.n > 0:
         coords_orig = coords_orig[:args.n]
     n = coords_orig.shape[0]
 
     # Check if we are running on full data for persistence
-    is_full_run = (args.n == 0 or args.n == coords_orig.shape[0])
-
-    time.time() - t0
+    is_full_run = args.n == 0 or args.n == coords_orig.shape[0]
 
     # 1.5 Hilbert Reorder for Cache Locality
-    t0 = time.time()
     coords, orig_to_new = hilbert_reorder_cities(coords_orig)
     new_to_orig = np.empty(n, dtype=np.int32)
     new_to_orig[orig_to_new] = np.arange(n, dtype=np.int32)
-    time.time() - t0
 
     # 2. Preprocessing
-    t0 = time.time()
     candidate_set = build_candidate_sets(coords, k=KD_TREE_QUERY_SIZE)
-    time.time() - t0
 
     # 2.5 HK Bound
-    t0 = time.time()
     lb_val = None
     pi = None
 
@@ -111,9 +118,6 @@ def main() -> None:
         # Map pi back to original order for saving
         pi_orig = pi[orig_to_new]
         save_cached_hk_main(n, lb_val, pi_orig)
-        time.time() - t0
-    else:
-        time.time() - t0
 
     # 2.6 Refinement
     t0 = time.time()
@@ -126,8 +130,6 @@ def main() -> None:
     time.time() - t0
 
     # 3. Seed Generation
-    t0 = time.time()
-
     if args.start_tour:
         start_tour_indices, _ = load_tour(args.start_tour)
         # Map tour to new order
@@ -142,8 +144,6 @@ def main() -> None:
     else:
         # Initial seeds are all Greedy NN from different starting points
         seeds = generate_greedy_nn_seeds(coords, candidate_set, num_seeds=args.seeds)
-
-    time.time() - t0
 
     # 4. Optimization
     num_processes = min(mp.cpu_count(), args.seeds)
@@ -166,7 +166,7 @@ def main() -> None:
             num_kicks=args.kicks,
             max_opt=args.max_opt,
             iteration_start_time=iter_start,
-            total_start_time=start_opt
+            total_start_time=start_opt,
         )
         # Track iteration best
         iter_best_tour = None
@@ -175,9 +175,6 @@ def main() -> None:
             if length < iter_best_length:
                 iter_best_length = length
                 iter_best_tour = tour.copy()
-
-        time.time() - iter_start
-        time.time() - start_opt
 
         if iter_best_length < global_best_length:
             global_best_length = iter_best_length
@@ -211,8 +208,6 @@ def main() -> None:
                 start_node = global_best_tour_new[i * step % n]
                 seeds[i] = rotate_tour(global_best_tour_new, start_node)
 
-    time.time() - start_opt
-
     if global_best_tour_new is None:
         return
 
@@ -231,8 +226,6 @@ def main() -> None:
             global_best_length,
             is_full_run=is_full_run,
         )
-    else:
-        pass
 
     time.time() - start_total
 

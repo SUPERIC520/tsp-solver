@@ -1,3 +1,5 @@
+"""Data I/O utilities for loading and saving TSP data and results."""
+
 import csv
 import pickle
 from pathlib import Path
@@ -11,7 +13,12 @@ def load_cities(filepath: str) -> np.ndarray:
     """Load city coordinates from a CSV file.
 
     Format: Index X Y (Space-separated)
-    Returns: np.ndarray of shape (N, 2) with dtype float64.
+
+    Args:
+        filepath: Path to the city coordinates file.
+
+    Returns:
+        np.ndarray: City coordinates of shape (N, 2), dtype float64.
     """
     # Using np.loadtxt which handles space-separated values by default
     # Usecols (1, 2) to skip the Index column
@@ -24,6 +31,11 @@ def save_solution_csv(filepath: str, tour: np.ndarray, length: float) -> None:
     Format:
     length,L
     index,I1,I2,...,IN.
+
+    Args:
+        filepath: Output CSV file path.
+        tour: Array of city indices.
+        length: Total tour length.
     """
     path = Path(filepath)
     with path.open("w", encoding="utf-8") as f:
@@ -34,16 +46,13 @@ def save_solution_csv(filepath: str, tour: np.ndarray, length: float) -> None:
 
 
 def load_best_length_from_csv(filepath: str) -> float:
-    """Reads a CSV file and parses the best length.
+    """Read a CSV file and parse the best length.
 
-    Returns np.inf if the file is missing or corrupt.
-    Supports:
-    1. Custom format:
-       length,L
-       indices,I1,I2...
-    2. Pandas format:
-       tour,length
-       "I1,I2...",L.
+    Args:
+        filepath: Path to the solution CSV file.
+
+    Returns:
+        float: The best length found, or np.inf if missing or corrupt.
     """
     path = Path(filepath)
     if not path.exists():
@@ -73,7 +82,13 @@ def load_best_length_from_csv(filepath: str) -> float:
 
 
 def save_tour(filepath: str, tour: np.ndarray, length: float) -> None:
-    """Save the optimized tour and its length to a file."""
+    """Save the optimized tour and its length to a text file.
+
+    Args:
+        filepath: Output file path.
+        tour: Array of city indices.
+        length: Total tour length.
+    """
     path = Path(filepath)
     with path.open("w", encoding="utf-8") as f:
         f.write(f"Total Length: {length}\n")
@@ -88,7 +103,12 @@ def load_tour(filepath: str) -> tuple[np.ndarray, float]:
 
     Supports simple file format (length\nindices) and CSV format
     (length,L\nindices,I1,I2...).
-    Returns: (tour_indices, length).
+
+    Args:
+        filepath: Path to the tour file.
+
+    Returns:
+        tuple[np.ndarray, float]: (tour_indices, length).
     """
     path = Path(filepath)
     if filepath.endswith(".csv"):
@@ -112,14 +132,28 @@ def load_tour(filepath: str) -> tuple[np.ndarray, float]:
 
 
 def get_hk_cache_paths(sample_name: str) -> tuple[str, str]:
-    """Generate paths for HK bound and Pi vector cache."""
+    """Generate paths for Held-Karp bound and Pi vector cache.
+
+    Args:
+        sample_name: Name of the city sample.
+
+    Returns:
+        tuple[str, str]: (bound_path, pi_path).
+    """
     bound_path = f"data/cache/{CACHE_VERSION}/sample_{sample_name}_hk.npy"
     pi_path = f"data/cache/{CACHE_VERSION}/sample_{sample_name}_pi.npy"
     return bound_path, pi_path
 
 
 def load_hk_cache(sample_name: str) -> tuple[float, np.ndarray] | None:
-    """Load HK bound and Pi vector from cache if they exist."""
+    """Load Held-Karp bound and Pi vector from cache if they exist.
+
+    Args:
+        sample_name: Name of the city sample.
+
+    Returns:
+        tuple[float, np.ndarray] | None: (bound, pi) if found, else None.
+    """
     bound_path, pi_path = get_hk_cache_paths(sample_name)
     bp = Path(bound_path)
     pp = Path(pi_path)
@@ -135,7 +169,13 @@ def load_hk_cache(sample_name: str) -> tuple[float, np.ndarray] | None:
 
 
 def save_hk_cache(sample_name: str, bound: float, pi: np.ndarray) -> None:
-    """Save HK bound and Pi vector to cache."""
+    """Save Held-Karp bound and Pi vector to cache.
+
+    Args:
+        sample_name: Name of the city sample.
+        bound: Computed lower bound.
+        pi: Computed pi vector.
+    """
     bound_path, pi_path = get_hk_cache_paths(sample_name)
     bp = Path(bound_path)
     bp.parent.mkdir(parents=True, exist_ok=True)

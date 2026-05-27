@@ -1,3 +1,5 @@
+"""Tests for seed generation strategies, including greedy NN and rotation."""
+
 import numba
 import numpy as np
 import pytest

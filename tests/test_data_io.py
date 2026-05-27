@@ -1,3 +1,5 @@
+"""Tests for data I/O utilities, including city loading and solution saving."""
+
 import os
 from typing import Any
 
@@ -8,6 +10,7 @@ from src.utils.data_io import load_cities, load_tour, save_tour
 
 
 def test_load_cities() -> None:
+    """Test loading city coordinates from a CSV file."""
     filepath = "tests/data/sample_cities.csv"
     coords = load_cities(filepath)
 
@@ -18,6 +21,7 @@ def test_load_cities() -> None:
 
 
 def test_save_and_load_tour(tmp_path: Any) -> None:
+    """Test saving a tour to disk and loading it back."""
     # Setup dummy data
     coords = np.array(
         [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.5, 0.5]], dtype=np.float64

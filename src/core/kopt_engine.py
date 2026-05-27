@@ -1,3 +1,10 @@
+"""K-opt engine for TSP optimization.
+
+This module provides high-performance K-opt (2-opt, 3-opt, 4-opt, 5-opt) and
+Or-opt local search implementations using Numba for acceleration. It also
+includes an Iterated Local Search (ILS) framework with double-bridge kicks.
+"""
+
 import time
 from typing import Any
 
@@ -49,6 +56,16 @@ def compute_tour_length(
     coords_x: np.ndarray,
     coords_y: np.ndarray,
 ) -> float:
+    """Compute the total length of a TSP tour.
+
+    Args:
+        tour: Array of city indices representing the tour.
+        coords_x: X-coordinates of the cities.
+        coords_y: Y-coordinates of the cities.
+
+    Returns:
+        The total Euclidean length of the tour.
+    """
     length = 0.0
     n = tour.shape[0]
     for i in range(n):

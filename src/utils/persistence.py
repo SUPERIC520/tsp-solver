@@ -1,3 +1,5 @@
+"""Utilities for persisting the best found tours and managing results."""
+
 import csv
 from pathlib import Path
 
@@ -13,10 +15,17 @@ def update_best_tour(
     *,
     is_full_run: bool = True,
 ) -> bool:
-    """Updates the optimal tour on disk if length is a global improvement.
+    """Update the optimal tour on disk if the new length is a global improvement.
 
-    Skipped if is_full_run is False to prevent overwriting global solutions
-    with sub-scale test runs.
+    Args:
+        best_tour_file: Path to the CSV file storing the best tour.
+        new_tour: Array of city indices for the new tour.
+        new_length: Total length of the new tour.
+        is_full_run: Whether this is a full production run. If False,
+            persistence is skipped to prevent overwriting global solutions.
+
+    Returns:
+        bool: True if the file was updated, False otherwise.
     """
     if not is_full_run:
         return False

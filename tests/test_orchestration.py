@@ -1,3 +1,5 @@
+"""Tests for the parallel orchestration and solver management."""
+
 import numpy as np
 import pytest
 

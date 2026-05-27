@@ -1,3 +1,9 @@
+"""Seed generation for TSP optimization.
+
+This module provides functions for generating initial tours (seeds) using
+greedy nearest-neighbor heuristics, with support for parallel execution.
+"""
+
 import multiprocessing as mp
 from typing import cast
 

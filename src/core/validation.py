@@ -1,3 +1,10 @@
+"""Validation utilities for TSP, including Held-Karp lower bounds and Alpha-values.
+
+This module provides functions to compute the Held-Karp lower bound using
+1-tree relaxations and subgradient optimization, and to calculate Alpha-values
+used for candidate set refinement.
+"""
+
 import json
 from pathlib import Path
 
@@ -12,6 +19,14 @@ CACHE_PATH = _root / ".cache" / "hk_bounds.json"
 
 
 def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:
+    """Load Held-Karp lower bound and pi values from JSON cache.
+
+    Args:
+        n: Number of cities.
+
+    Returns:
+        A tuple (lower_bound, pi_array) if found, else None.
+    """
     if not CACHE_PATH.exists():
         return None
     try:
@@ -33,6 +48,13 @@ def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:
 
 
 def save_hk_cache_json(n: int, lb: float, pi: np.ndarray) -> None:
+    """Save Held-Karp lower bound and pi values to JSON cache.
+
+    Args:
+        n: Number of cities.
+        lb: Lower bound value.
+        pi: Pi values array.
+    """
     data = {}
     if CACHE_PATH.exists():
         try:
@@ -150,6 +172,19 @@ def compute_mst_weight(
     pi: np.ndarray,
     root: int,
 ) -> tuple[float, np.ndarray, np.ndarray]:
+    """Compute the Minimum Spanning Tree (MST) weight of a 1-tree relaxation.
+
+    Args:
+        n: Number of cities.
+        coords: Coordinates of the cities.
+        adj_ptr: Adjacency list pointer.
+        adj_indices: Adjacency list indices.
+        pi: Pi values for distance transformation.
+        root: The root node for the 1-tree.
+
+    Returns:
+        A tuple (total_weight, degrees, parent_array).
+    """
     min_dist = np.full(n, np.inf, dtype=np.float64)
     parent = np.full(n, -1, dtype=np.int32)
     visited = np.zeros(n, dtype=np.bool_)
@@ -281,6 +316,19 @@ def compute_hk_lower_bound(
     target_ub: float = np.inf,
     sample_name: str | None = None,
 ) -> tuple[float, np.ndarray]:
+    """Compute the Held-Karp lower bound.
+
+    Args:
+        coords: Coordinates of the cities.
+        candidate_set: Candidate set for neighbor pruning.
+        max_iter: Maximum number of subgradient iterations.
+        initial_pi: Initial pi values for subgradient optimization.
+        target_ub: Target upper bound for step size calculation.
+        sample_name: Name of the sample for caching.
+
+    Returns:
+        A tuple (lower_bound, pi_array).
+    """
     n = coords.shape[0]
     cached_json = load_hk_cache_json(n)
     if cached_json is not None:
@@ -312,6 +360,19 @@ def compute_hk_lower_bound(
 def compute_alpha_values(
     n: int, coords: np.ndarray, candidate_set: np.ndarray, pi: np.ndarray
 ) -> np.ndarray:
+    """Compute Alpha-values for candidate set refinement.
+
+    Alpha-values measure the 'nearness' of an edge to the MST.
+
+    Args:
+        n: Number of cities.
+        coords: Coordinates of the cities.
+        candidate_set: Candidate set for neighbor pruning.
+        pi: Pi values from Held-Karp relaxation.
+
+    Returns:
+        A matrix of Alpha-values of shape (n, num_candidates).
+    """
     coords = np.ascontiguousarray(coords)
     candidate_set = np.ascontiguousarray(candidate_set)
     pi = np.ascontiguousarray(pi)
@@ -429,6 +490,15 @@ def compute_alpha_values(
 
 
 def validate_result(best_length: float, lower_bound: float) -> float:
+    """Calculate the percentage optimality gap between the best length and lower bound.
+
+    Args:
+        best_length: The length of the best tour found.
+        lower_bound: The lower bound on the optimal tour length.
+
+    Returns:
+        The percentage gap (0-100). Returns 100.0 if lower_bound <= 0.
+    """
     if lower_bound <= 0:
         return 100.0
     return (best_length - lower_bound) / lower_bound * 100.0

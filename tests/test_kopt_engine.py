@@ -1,3 +1,5 @@
+"""Tests for the K-Opt optimization engine."""
+
 from collections.abc import Generator
 
 import numba

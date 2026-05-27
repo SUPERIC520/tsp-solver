@@ -1,3 +1,5 @@
+"""Tests for Held-Karp lower bounds and solution validation."""
+
 import numpy as np
 
 from src.core.preprocessing import build_candidate_sets

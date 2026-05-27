@@ -1,3 +1,5 @@
+"""Pytest configuration and shared fixtures for the TSP solver tests."""
+
 import os
 import platform
 

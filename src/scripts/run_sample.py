@@ -1,3 +1,9 @@
+"""Benchmark script for testing the TSP Solver on smaller subsets.
+
+This script allows for quick experimentation and validation of the solver's
+performance on subsets of the city data.
+"""
+
 import argparse
 import time
 from pathlib import Path
@@ -19,6 +25,7 @@ SUCCESS_GAP_THRESHOLD = 5.0
 
 
 def warmup() -> None:
+    """Trigger Numba JIT compilation with a small problem."""
     coords_x = np.array([0, 1, 1, 0, 0.5], dtype=np.float64)
     coords_y = np.array([0, 0, 1, 1, 0.5], dtype=np.float64)
     cs = np.array(
@@ -44,6 +51,19 @@ def run_benchmark(
     *,
     max_opt: int = 3,
 ) -> tuple[float, float]:
+    """Run a TSP solver benchmark on a city subset.
+
+    Args:
+        n_sample: Number of cities to sample.
+        num_seeds: Number of initial seeds.
+        num_kicks: Number of kicks per seed.
+        num_iterations: Number of optimization iterations.
+        hk_iter: Held-Karp iterations.
+        max_opt: Maximum K for K-Opt.
+
+    Returns:
+        A tuple (gap_percentage, total_time_seconds).
+    """
     warmup()
     start_total = time.time()
 
@@ -59,10 +79,8 @@ def run_benchmark(
     new_to_orig[orig_to_new] = np.arange(n, dtype=np.int32)
 
     # 2. Preprocessing
-    time.time()
     candidate_set = build_candidate_sets(coords, k=64)
 
-    time.time()
     lb_val, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=hk_iter)
 
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
@@ -77,7 +95,6 @@ def run_benchmark(
     global_best_tour_new = None
 
     for _iter_idx in range(num_iterations):
-        time.time()
         results = parallel_solve(
             seeds,
             coords,
@@ -98,8 +115,6 @@ def run_benchmark(
             global_best_tour_new = (
                 iter_best_tour.copy() if iter_best_tour is not None else None
             )
-        else:
-            pass
 
         # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour
         # for next seeds

@@ -1,3 +1,10 @@
+"""Orchestration for parallel TSP optimization.
+
+This module provides the infrastructure to run multiple optimization seeds
+in parallel using Python's multiprocessing module, with real-time progress
+tracking through shared memory.
+"""
+
 import multiprocessing as mp
 import sys
 import time

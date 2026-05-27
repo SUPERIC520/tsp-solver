@@ -1,3 +1,5 @@
+"""Tests for advanced features of the TSP solver, including Alpha-values and MST."""
+
 import numpy as np
 
 from src.core.preprocessing import build_candidate_sets, refine_candidate_set_with_alpha

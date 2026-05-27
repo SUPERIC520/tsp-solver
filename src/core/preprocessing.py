@@ -1,3 +1,10 @@
+"""Preprocessing utilities for TSP.
+
+This module provides functions for reordering cities using Hilbert curves,
+building candidate sets using KD-Trees, and refining candidate sets using
+Alpha-values.
+"""
+
 from typing import Any
 
 import numpy as np
@@ -223,7 +230,8 @@ def build_candidate_sets(
 
     tree = KDTree(coords)
     query_k = min(k + 1, n)
-    _, indices = tree.query(coords, k=query_k)
+    _, indices_raw = tree.query(coords, k=query_k)
+    indices = np.asarray(indices_raw)
 
     if indices.ndim == 1:
         indices = indices.reshape(-1, 1)

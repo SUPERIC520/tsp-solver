@@ -15,7 +15,6 @@ dependencies = [
 
 [tool.mypy]
 strict = true
-ignore_missing_imports = true
 disallow_untyped_defs = true
 disallow_any_generics = true
 check_untyped_defs = true
@@ -25,6 +24,10 @@ warn_unused_ignores = true
 warn_return_any = true
 warn_unreachable = true
 
+[[tool.mypy.overrides]]
+module = "numba.*"
+ignore_missing_imports = true
+
 [tool.ruff]
 line-length = 88
 target-version = "py312"
@@ -32,12 +35,6 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D100", # Missing docstring in public module
-    "D101", # Missing docstring in public class
-    "D102", # Missing docstring in public method
-    "D103", # Missing docstring in public function
-    "D104", # Missing docstring in public package
-    "D107", # Missing docstring in __init__
     "COM812", # Trailing comma missing (conflicts with formatter)
     "ISC001", # Single line implicit string concatenation (conflicts with formatter)
     "PGH003", # Use specific rule codes when ignoring type issues (too many type: ignores for numba)
@@ -99,4 +96,9 @@ convention = "google"
 testpaths = ["tests"]
 python_files = "test_*.py"
 addopts = "--strict-markers --strict-config -ra"
+
+[dependency-groups]
+dev = [
+    "scipy-stubs>=1.17.1.5",
+]
 
