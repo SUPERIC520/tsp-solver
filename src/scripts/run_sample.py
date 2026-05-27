@@ -20,7 +20,8 @@ from src.core.preprocessing import (
 )
 from src.core.seed_generation import generate_greedy_nn_seeds, rotate_tour
 from src.core.validation import compute_hk_lower_bound, validate_result
-from src.utils.data_io import load_cities
+from src.utils.data_io import load_cities, save_solution_csv
+from src.utils.persistence import update_best_tour
 
 SUCCESS_GAP_THRESHOLD = 5.0
 
@@ -72,13 +73,10 @@ def run_benchmark(
     coords_full = load_cities(str(DATA_PATH))
     total_cities = coords_full.shape[0]
 
-    if n_sample > 0:
-        coords_orig = coords_full[:n_sample]
-    else:
-        coords_orig = coords_full
+    coords_orig = coords_full[:n_sample] if n_sample > 0 else coords_full
     n = coords_orig.shape[0]
 
-    # Check if we are running on full data (if we ever need to persist)
+    # Check if we are running on full data for persistence
     is_full_run = n == total_cities
 
     # 1.5 Hilbert Reorder
@@ -124,6 +122,22 @@ def run_benchmark(
                 iter_best_tour.copy() if iter_best_tour is not None else None
             )
 
+            # Save intermediate result
+            if global_best_tour_new is not None:
+                temp_best_tour = new_to_orig[global_best_tour_new]
+                save_solution_csv(
+                    "data/solutions.csv", temp_best_tour, global_best_length
+                )
+                if is_full_run:
+                    update_best_tour(
+                        "data/best_tour.csv",
+                        temp_best_tour,
+                        global_best_length,
+                        is_full_run=is_full_run,
+                    )
+        else:
+            pass
+
         # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour
         # for next seeds
         if global_best_tour_new is not None:
@@ -135,6 +149,19 @@ def run_benchmark(
     # 5. Validation
     if global_best_tour_new is None:
         return 0.0, 0.0
+
+    # Map best tour back to original indices
+    best_tour = new_to_orig[global_best_tour_new]
+
+    # Save final results
+    save_solution_csv("data/solutions.csv", best_tour, global_best_length)
+    if is_full_run:
+        update_best_tour(
+            "data/best_tour.csv",
+            best_tour,
+            global_best_length,
+            is_full_run=is_full_run,
+        )
 
     gap = validate_result(global_best_length, lb_val)
 

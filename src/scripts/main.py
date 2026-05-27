@@ -83,10 +83,7 @@ def main() -> None:
     coords_full = load_cities(str(DATA_PATH))
     total_cities = coords_full.shape[0]
 
-    if args.n > 0:
-        coords_orig = coords_full[:args.n]
-    else:
-        coords_orig = coords_full
+    coords_orig = coords_full[:args.n] if args.n > 0 else coords_full
     n = coords_orig.shape[0]
 
     # Check if we are running on full data for persistence
