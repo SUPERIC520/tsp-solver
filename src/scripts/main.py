@@ -135,6 +135,7 @@ def main() -> None:
             pi_orig = np.load(pi_npy)
             # Map cached pi (which was in original order) to new order
             pi = pi_orig[new_to_orig]
+            print(f"  - Loaded cached LB: {lb_val:.2f}")  # noqa: T201
 
     if lb_val is None:
         print(  # noqa: T201
