@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from src.config import DATA_PATH
 from src.core.kopt_engine import cascading_kopt_optimize
 from src.core.orchestration import parallel_solve
 from src.core.preprocessing import (
@@ -68,10 +69,17 @@ def run_benchmark(
     start_total = time.time()
 
     # 1. Load Data
-    coords_orig = load_cities("data/cities.csv")
+    coords_full = load_cities(str(DATA_PATH))
+    total_cities = coords_full.shape[0]
+
     if n_sample > 0:
-        coords_orig = coords_orig[:n_sample]
+        coords_orig = coords_full[:n_sample]
+    else:
+        coords_orig = coords_full
     n = coords_orig.shape[0]
+
+    # Check if we are running on full data (if we ever need to persist)
+    is_full_run = n == total_cities
 
     # 1.5 Hilbert Reorder
     coords, orig_to_new = hilbert_reorder_cities(coords_orig)

@@ -30,7 +30,7 @@ def save_solution_csv(filepath: str, tour: np.ndarray, length: float) -> None:
 
     Format:
     length,L
-    index,I1,I2,...,IN.
+    indices,I1,I2,...,IN.
 
     Args:
         filepath: Output CSV file path.

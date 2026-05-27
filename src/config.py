@@ -18,6 +18,9 @@ def _get_cache_version() -> str:
     except (OSError, IndexError):
         return "default"
 
+# Path to the primary city coordinates dataset
+DATA_PATH: Path = Path("data/cities.csv")
+
 # Cache version for generated artifacts (e.g. .npy bounds).
 CACHE_VERSION: str = _get_cache_version()
 

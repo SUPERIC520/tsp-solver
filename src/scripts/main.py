@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.config import CACHE_VERSION, K_NEIGHBORS, KD_TREE_QUERY_SIZE
+from src.config import CACHE_VERSION, DATA_PATH, K_NEIGHBORS, KD_TREE_QUERY_SIZE
 from src.core.orchestration import parallel_solve
 from src.core.preprocessing import (
     build_candidate_sets,
@@ -80,13 +80,18 @@ def main() -> None:
     start_total = time.time()
 
     # 1. Load Data
-    coords_orig = load_cities("data/cities.csv")
+    coords_full = load_cities(str(DATA_PATH))
+    total_cities = coords_full.shape[0]
+
     if args.n > 0:
-        coords_orig = coords_orig[:args.n]
+        coords_orig = coords_full[:args.n]
+    else:
+        coords_orig = coords_full
     n = coords_orig.shape[0]
 
     # Check if we are running on full data for persistence
-    is_full_run = args.n == 0 or args.n == coords_orig.shape[0]
+    # We only update best_tour.csv if we are solving the complete problem
+    is_full_run = n == total_cities
 
     # 1.5 Hilbert Reorder for Cache Locality
     coords, orig_to_new = hilbert_reorder_cities(coords_orig)

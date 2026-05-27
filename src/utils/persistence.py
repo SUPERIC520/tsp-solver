@@ -1,11 +1,10 @@
 """Utilities for persisting the best found tours and managing results."""
 
-import csv
 from pathlib import Path
 
 import numpy as np
 
-from src.utils.data_io import load_best_length_from_csv
+from src.utils.data_io import load_best_length_from_csv, save_solution_csv
 
 
 def update_best_tour(
@@ -34,11 +33,7 @@ def update_best_tour(
     if new_length < current_best:
         path = Path(best_tour_file)
         path.parent.mkdir(parents=True, exist_ok=True)
-        tour_str = ",".join(map(str, new_tour.tolist()))
-        with path.open("w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            writer.writerow(["tour", "length"])
-            writer.writerow([tour_str, str(new_length)])
+        save_solution_csv(best_tour_file, new_tour, new_length)
         return True
 
     return False
