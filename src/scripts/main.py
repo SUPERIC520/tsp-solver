@@ -143,7 +143,7 @@ def main() -> None:
             f"Computing HK LB ({args.hk_iter} iterations)..."
         )
         lb_val, pi = compute_hk_lower_bound(
-            coords, candidate_set, max_iter=args.hk_iter
+            coords, candidate_set, max_iter=args.hk_iter, use_cache=not args.no_cache
         )
         # Map pi back to original order for saving
         pi_orig = pi[orig_to_new]

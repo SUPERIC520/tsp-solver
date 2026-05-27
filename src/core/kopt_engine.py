@@ -12,8 +12,27 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
 
-from src.config import K_3OPT, K_4OPT, K_5OPT, K_NEIGHBORS, OR_OPT_MAX_LEN
+from src.config import K_NEIGHBORS, MAX_OPT, GAIN_EPSILON, K_3OPT, K_4OPT, K_5OPT, OR_OPT_MAX_LEN, LOCALIZED_KICK_THRESHOLD, MIN_TOUR_SIZE_2OPT, MIN_TOUR_SIZE_3OPT, MIN_TOUR_SIZE_4OPT, MIN_TOUR_SIZE_5OPT, MIN_TOUR_SIZE_KICK
+# Maximum local search cascade depth level
+MAX_OPT: int = 5
+
 from src.utils.memory_utils import ensure_alignment
+
+
+# Optimization levels
+OPT_LEVEL_3: int = 3
+OPT_LEVEL_4: int = 4
+OPT_LEVEL_5: int = 5
+
+# 3-opt edge reconnection case indices
+CASE_1: int = 1
+CASE_2: int = 2
+CASE_3: int = 3
+CASE_4: int = 4
+CASE_5: int = 5
+CASE_6: int = 6
+CASE_7: int = 7
+CASE_8: int = 8
 
 
 @njit(inline="always", fastmath=True)  # type: ignore
@@ -82,7 +101,7 @@ def _optimize_2opt(
     dlb: npt.NDArray[np.bool_],
 ) -> bool:
     n = tour.shape[0]
-    if n < 4:
+    if n < MIN_TOUR_SIZE_2OPT:
         return False
     globally_improved = False
 
@@ -115,7 +134,7 @@ def _optimize_2opt(
 
             if (
                 dist_uv + _dist(w, x, coords_x, coords_y)
-                > dist_uw + _dist(v, x, coords_x, coords_y) + 1e-9
+                > dist_uw + _dist(v, x, coords_x, coords_y) + GAIN_EPSILON
             ):
                 _apply_2opt(tour, v_idx, w_idx)
                 _update_pos(tour, pos)
@@ -161,7 +180,7 @@ def _reconstruct_tour_3opt(
     # S2: from i2 + 1 to i3 (inclusive)
     # S3: from i3 + 1 to i1 (inclusive, wrapping around)
 
-    if case_idx == 4:
+    if case_idx == CASE_4:
         # S1 + S2_rev + S3_rev
         for i in range(i1 + 1, i2 + 1):
             new_tour[curr] = tour[i]
@@ -176,7 +195,7 @@ def _reconstruct_tour_3opt(
             new_tour[curr] = tour[idx]
             curr += 1
 
-    elif case_idx == 5:
+    elif case_idx == CASE_5:
         # S1 + S3 + S2
         for i in range(i1 + 1, i2 + 1):
             new_tour[curr] = tour[i]
@@ -190,7 +209,7 @@ def _reconstruct_tour_3opt(
             new_tour[curr] = tour[i]
             curr += 1
 
-    elif case_idx == 6:
+    elif case_idx == CASE_6:
         # S1 + S3_rev + S2
         for i in range(i1 + 1, i2 + 1):
             new_tour[curr] = tour[i]
@@ -204,7 +223,7 @@ def _reconstruct_tour_3opt(
             new_tour[curr] = tour[i]
             curr += 1
 
-    elif case_idx == 7:
+    elif case_idx == CASE_7:
         # S1 + S3 + S2_rev
         for i in range(i1 + 1, i2 + 1):
             new_tour[curr] = tour[i]
@@ -219,7 +238,7 @@ def _reconstruct_tour_3opt(
             new_tour[curr] = tour[idx]
             curr += 1
 
-    elif case_idx == 8:
+    elif case_idx == CASE_8:
         # S1 + S3_rev + S2_rev
         for i in range(i1 + 1, i2 + 1):
             new_tour[curr] = tour[i]
@@ -248,7 +267,7 @@ def _optimize_3opt_sequential(
     dlb: npt.NDArray[np.bool_],
 ) -> bool:
     n = tour.shape[0]
-    if n < 6:
+    if n < MIN_TOUR_SIZE_3OPT:
         return False
     globally_improved = False
 
@@ -274,7 +293,7 @@ def _optimize_3opt_sequential(
             dist_t2_t3 = float(candidate_dists[t2, k3])
             g1 = dist_t1_t2 - dist_t2_t3
             # Prune early if first cut has negative gain
-            if g1 <= 1e-9:
+            if g1 <= GAIN_EPSILON:
                 continue
 
             t3_idx = int(pos[t3])
@@ -293,7 +312,7 @@ def _optimize_3opt_sequential(
                         continue
                     dist_t4_t5 = float(candidate_dists[t4, k5])
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
-                    if g2 <= 1e-9:
+                    if g2 <= GAIN_EPSILON:
                         continue
 
                     t5_idx = int(pos[t5])
@@ -334,7 +353,7 @@ def _optimize_3opt_sequential(
                         )
 
                         best_case = -1
-                        best_delta = -1e-9
+                        best_delta = -GAIN_EPSILON
 
                         # Case 4
                         d4 = (
@@ -345,7 +364,7 @@ def _optimize_3opt_sequential(
                         )
                         if d4 < best_delta:
                             best_delta = d4
-                            best_case = 4
+                            best_case = CASE_4
 
                         # Case 5
                         d5 = (
@@ -356,7 +375,7 @@ def _optimize_3opt_sequential(
                         )
                         if d5 < best_delta:
                             best_delta = d5
-                            best_case = 5
+                            best_case = CASE_5
 
                         # Case 6
                         d6 = (
@@ -367,7 +386,7 @@ def _optimize_3opt_sequential(
                         )
                         if d6 < best_delta:
                             best_delta = d6
-                            best_case = 6
+                            best_case = CASE_6
 
                         # Case 7
                         d7 = (
@@ -378,7 +397,7 @@ def _optimize_3opt_sequential(
                         )
                         if d7 < best_delta:
                             best_delta = d7
-                            best_case = 7
+                            best_case = CASE_7
 
                         # Case 8
                         d8 = (
@@ -389,7 +408,7 @@ def _optimize_3opt_sequential(
                         )
                         if d8 < best_delta:
                             best_delta = d8
-                            best_case = 8
+                            best_case = CASE_8
 
                         if best_case != -1:
                             new_tour = _reconstruct_tour_3opt(
@@ -451,7 +470,7 @@ def _optimize_or_opt(
                 + _dist(v, s_v, coords_x, coords_y)
                 - _dist(p_u, s_v, coords_x, coords_y)
             )
-            if base_g <= 1e-9:
+            if base_g <= GAIN_EPSILON:
                 continue
 
             for k in range(num_cand):
@@ -574,7 +593,7 @@ def _optimize_4opt_sequential(
     dlb: npt.NDArray[np.bool_],
 ) -> bool:
     n = tour.shape[0]
-    if n < 8:
+    if n < MIN_TOUR_SIZE_4OPT:
         return False
     globally_improved = False
 
@@ -600,7 +619,7 @@ def _optimize_4opt_sequential(
                 continue
             dist_t2_t3 = float(candidate_dists[t2, k3])
             g1 = dist_t1_t2 - dist_t2_t3
-            if g1 <= 1e-9:
+            if g1 <= GAIN_EPSILON:
                 continue
 
             t3_idx = int(pos[t3])
@@ -619,7 +638,7 @@ def _optimize_4opt_sequential(
                         continue
                     dist_t4_t5 = float(candidate_dists[t4, k5])
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
-                    if g2 <= 1e-9:
+                    if g2 <= GAIN_EPSILON:
                         continue
 
                     t5_idx = int(pos[t5])
@@ -638,7 +657,7 @@ def _optimize_4opt_sequential(
                                 continue
                             dist_t6_t7 = float(candidate_dists[t6, k7])
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
-                            if g3 <= 1e-9:
+                            if g3 <= GAIN_EPSILON:
                                 continue
 
                             t7_idx = int(pos[t7])
@@ -651,7 +670,7 @@ def _optimize_4opt_sequential(
 
                                 g4_part = g3 + dist_t7_t8
                                 gain = g4_part - _dist(t8, t1, coords_x, coords_y)
-                                if gain > 1e-9:
+                                if gain > GAIN_EPSILON:
                                     _apply_2opt_indices(
                                         tour, t1_idx, t2_idx, t3_idx, t4_idx
                                     )
@@ -705,7 +724,7 @@ def _optimize_5opt_sequential(
     dlb: npt.NDArray[np.bool_],
 ) -> bool:
     n = tour.shape[0]
-    if n < 10:
+    if n < MIN_TOUR_SIZE_5OPT:
         return False
     globally_improved = False
 
@@ -732,7 +751,7 @@ def _optimize_5opt_sequential(
                 continue
             dist_t2_t3 = float(candidate_dists[t2, k3])
             g1 = dist_t1_t2 - dist_t2_t3
-            if g1 <= 1e-9:
+            if g1 <= GAIN_EPSILON:
                 continue
 
             t3_idx = int(pos[t3])
@@ -751,7 +770,7 @@ def _optimize_5opt_sequential(
                         continue
                     dist_t4_t5 = float(candidate_dists[t4, k5])
                     g2 = g1 + dist_t3_t4 - dist_t4_t5
-                    if g2 <= 1e-9:
+                    if g2 <= GAIN_EPSILON:
                         continue
 
                     t5_idx = int(pos[t5])
@@ -770,7 +789,7 @@ def _optimize_5opt_sequential(
                                 continue
                             dist_t6_t7 = float(candidate_dists[t6, k7])
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
-                            if g3 <= 1e-9:
+                            if g3 <= GAIN_EPSILON:
                                 continue
 
                             t7_idx = int(pos[t7])
@@ -789,7 +808,7 @@ def _optimize_5opt_sequential(
                                         continue
                                     dist_t8_t9 = float(candidate_dists[t8, k9])
                                     g4 = g3 + dist_t7_t8 - dist_t8_t9
-                                    if g4 <= 1e-9:
+                                    if g4 <= GAIN_EPSILON:
                                         continue
 
                                     t9_idx = int(pos[t9])
@@ -804,7 +823,7 @@ def _optimize_5opt_sequential(
                                         gain = g5_part - _dist(
                                             t10, t1, coords_x, coords_y
                                         )
-                                        if gain > 1e-9:
+                                        if gain > GAIN_EPSILON:
                                             _apply_2opt_indices(
                                                 tour, t1_idx, t2_idx, t3_idx, t4_idx
                                             )
@@ -901,19 +920,19 @@ def _full_cascade(
             continue
 
         # Or-opt and 3-opt sequential
-        if max_opt >= 3 and _optimize_3opt_sequential(
+        if max_opt >= OPT_LEVEL_3 and _optimize_3opt_sequential(
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
             continue
 
-        if max_opt >= 4 and _optimize_4opt_sequential(
+        if max_opt >= OPT_LEVEL_4 and _optimize_4opt_sequential(
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
             continue
 
-        if max_opt >= 5 and _optimize_5opt_sequential(
+        if max_opt >= OPT_LEVEL_5 and _optimize_5opt_sequential(
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
@@ -923,13 +942,13 @@ def _full_cascade(
 @njit(fastmath=True, cache=True)  # type: ignore
 def _double_bridge_kick(tour: npt.NDArray[np.int32]) -> None:
     n = tour.shape[0]
-    if n < 8:
+    if n < MIN_TOUR_SIZE_KICK:
         return
 
     # Choose 4 positions to cut the tour.
     # For large tours, use a localized window to avoid creating long,
     # unrepairable edges.
-    if n <= 1000:
+    if n <= LOCALIZED_KICK_THRESHOLD:
         indices = np.random.choice(n, 4, replace=False)  # noqa: NPY002
         indices.sort()
         p1, p2, p3, p4 = (

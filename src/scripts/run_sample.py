@@ -51,6 +51,7 @@ def run_benchmark(
     hk_iter: int = 2000,
     *,
     max_opt: int = 3,
+    force_hk: bool = False,
 ) -> tuple[float, float]:
     """Run a TSP solver benchmark on a city subset.
 
@@ -61,6 +62,7 @@ def run_benchmark(
         num_iterations: Number of optimization iterations.
         hk_iter: Held-Karp iterations.
         max_opt: Maximum K for K-Opt.
+        force_hk: Whether to force recalculation of the Held-Karp bound.
 
     Returns:
         A tuple (gap_percentage, total_time_seconds).
@@ -96,7 +98,9 @@ def run_benchmark(
         f"(HK max_iter={hk_iter})..."
     )
     start_alpha = time.time()
-    lb_val, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=hk_iter)
+    lb_val, pi = compute_hk_lower_bound(
+        coords, candidate_set, max_iter=hk_iter, use_cache=not force_hk
+    )
 
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
     # Keep top 40 after refinement
@@ -228,4 +232,5 @@ if __name__ == "__main__":
         args.iters,
         args.hk_iter,
         max_opt=args.max_opt,
+        force_hk=args.force_hk,
     )

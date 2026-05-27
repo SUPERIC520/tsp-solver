@@ -97,19 +97,44 @@ def test_hk_bound_precision_and_cache() -> None:
     dummy_lb = 42.42
     dummy_pi = np.ones(dummy_n, dtype=np.float64) * 0.123
 
-    save_hk_cache_json(dummy_n, dummy_lb, dummy_pi)
+    # Save with 100 iterations
+    save_hk_cache_json(dummy_n, dummy_lb, dummy_pi, hk_iter=100)
 
-    loaded = load_hk_cache_json(dummy_n)
+    # Requesting 100 iterations should hit the cache
+    loaded = load_hk_cache_json(dummy_n, max_iter=100)
     assert loaded is not None
     assert np.isclose(loaded[0], dummy_lb)
     assert np.allclose(loaded[1], dummy_pi)
 
+    # Requesting 200 iterations should NOT hit the cache
+    loaded_more = load_hk_cache_json(dummy_n, max_iter=200)
+    assert loaded_more is None
+
     dummy_coords = np.zeros((dummy_n, 2), dtype=np.float64)
     dummy_candidates = np.zeros((dummy_n, 3), dtype=np.int32)
 
-    lb_cached, pi_cached = compute_hk_lower_bound(dummy_coords, dummy_candidates)
+    # compute_hk_lower_bound with max_iter=100 should hit the cache
+    lb_cached, pi_cached = compute_hk_lower_bound(
+        dummy_coords, dummy_candidates, max_iter=100
+    )
     assert np.isclose(lb_cached, dummy_lb)
     assert np.allclose(pi_cached, dummy_pi)
+
+    # compute_hk_lower_bound with max_iter=200 should NOT hit the cache
+    # (it will recompute, returning 0.0)
+    lb_higher_iter, _ = compute_hk_lower_bound(
+        dummy_coords, dummy_candidates, max_iter=200
+    )
+    assert np.isclose(lb_higher_iter, 0.0)
+    assert not np.isclose(lb_higher_iter, dummy_lb)
+
+    # Testing use_cache=False: it should not load the dummy cache but
+    # instead run the calculation (returning 0.0 for zero coordinates)
+    lb_uncached, _pi_uncached = compute_hk_lower_bound(
+        dummy_coords, dummy_candidates, max_iter=100, use_cache=False
+    )
+    assert np.isclose(lb_uncached, 0.0)
+    assert not np.isclose(lb_uncached, dummy_lb)
 
     # Clean up dummy entry
     import json

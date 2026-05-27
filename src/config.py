@@ -34,10 +34,7 @@ BEST_TOUR_PATH: Path = Path("data/best_tour.csv")
 NOTES_PATH: Path = Path("notes.md")
 
 # Directory for generated artifacts (e.g. .npy bounds)
-CACHE_DIR: Path = Path("data/cache")
-
-# Path to the Held-Karp bounds JSON cache
-HK_BOUNDS_CACHE: Path = Path(".cache/hk_bounds.json")
+CACHE_DIR: Path = Path(".cache")
 
 # Cache version for generated artifacts
 CACHE_VERSION: str = _get_cache_version()
@@ -48,20 +45,29 @@ KD_TREE_QUERY_SIZE: int = 64
 # Final alpha-sorted candidate set size for local search width
 K_NEIGHBORS: int = 64
 
-# Dynamic funneling width limit for sequential 3-opt
+# Maximum local search cascade depth level
+MAX_OPT: int = 5
+
+# Gain tolerance epsilon for pruning and validation
+GAIN_EPSILON: float = 1e-9
+
+# Dynamic funneling width limits
 K_3OPT: int = 48
-
-# Dynamic funneling width limit for sequential 4-opt
 K_4OPT: int = 32
-
-# Dynamic funneling width limit for sequential 5-opt
 K_5OPT: int = 16
 
 # Maximum segment length for Or-opt relocations
 OR_OPT_MAX_LEN: int = 8
 
-# Maximum local search cascade depth level
-MAX_OPT: int = 5
+# Localized kick window threshold for double-bridge perturbation
+LOCALIZED_KICK_THRESHOLD: int = 1000
+
+# Minimum tour size requirements for sequential optimizations
+MIN_TOUR_SIZE_2OPT: int = 4
+MIN_TOUR_SIZE_3OPT: int = 6
+MIN_TOUR_SIZE_4OPT: int = 8
+MIN_TOUR_SIZE_5OPT: int = 10
+MIN_TOUR_SIZE_KICK: int = 8
 
 # CPU process count for solver concurrency, default -1 to use CPU cores
 NUM_PROCESSES_SOLVER: int = -1

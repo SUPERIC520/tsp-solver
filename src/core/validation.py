@@ -12,22 +12,28 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
 
-from src.config import HK_BOUNDS_CACHE
+from src.config import CACHE_DIR, CACHE_VERSION
 from src.utils.data_io import load_hk_cache, save_hk_cache
+
+# Minimum lambda threshold for Held-Karp subgradient optimization
+HK_MIN_LAMBDA: float = 0.0001
 
 # Project root is two levels up from src/core/validation.py
 _root = Path(__file__).resolve().parent.parent.parent
-CACHE_PATH = HK_BOUNDS_CACHE
+CACHE_PATH = CACHE_DIR / CACHE_VERSION / "hk_bounds.json"
 
 
-def load_hk_cache_json(n: int) -> tuple[float, npt.NDArray[np.float64]] | None:
-    """Load Held-Karp lower bound and pi values from JSON cache.
+def load_hk_cache_json(
+    n: int, max_iter: int
+) -> tuple[float, npt.NDArray[np.float64]] | None:
+    """Load Held-Karp bound and pi values from JSON cache if iterations match.
 
     Args:
         n: Number of cities.
+        max_iter: Minimum required iteration count.
 
     Returns:
-        A tuple (lower_bound, pi_array) if found, else None.
+        A tuple (lower_bound, pi_array) if found and has enough iterations, else None.
     """
     if not CACHE_PATH.exists():
         return None
@@ -37,25 +43,54 @@ def load_hk_cache_json(n: int) -> tuple[float, npt.NDArray[np.float64]] | None:
         key = str(n)
         if key in data:
             entry = data[key]
-            # Support both old "lower_bound" key and new canonical "lb" key
-            lb_val = entry.get("lb", entry.get("lower_bound"))
-            if lb_val is None:
-                return None
-            lb = float(lb_val)
-            pi = np.array(entry["pi"], dtype=np.float64)
-            return lb, pi
+            # Match params to hk iters specifically
+            # (must have at least requested iterations)
+            cached_iter = entry.get("hk_iter", 0)
+            if cached_iter >= max_iter:
+                lb_val = entry.get("lb", entry.get("lower_bound"))
+                if lb_val is not None:
+                    lb = float(lb_val)
+                    pi = np.array(entry["pi"], dtype=np.float64)
+                    return lb, pi
     except (OSError, ValueError, KeyError):
         pass
     return None
 
 
-def save_hk_cache_json(n: int, lb: float, pi: npt.NDArray[np.float64]) -> None:
+def load_hk_cache_pi_only(n: int) -> npt.NDArray[np.float64] | None:
+    """Load cached pi values from JSON cache for warm starting.
+
+    Args:
+        n: Number of cities.
+
+    Returns:
+        Pi values array if found, else None.
+    """
+    if not CACHE_PATH.exists():
+        return None
+    try:
+        with CACHE_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        key = str(n)
+        if key in data:
+            entry = data[key]
+            if "pi" in entry:
+                return np.array(entry["pi"], dtype=np.float64)
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def save_hk_cache_json(
+    n: int, lb: float, pi: npt.NDArray[np.float64], hk_iter: int
+) -> None:
     """Save Held-Karp lower bound and pi values to JSON cache.
 
     Args:
         n: Number of cities.
         lb: Lower bound value.
         pi: Pi values array.
+        hk_iter: Iterations used to compute this bound.
     """
     data = {}
     if CACHE_PATH.exists():
@@ -65,14 +100,23 @@ def save_hk_cache_json(n: int, lb: float, pi: npt.NDArray[np.float64]) -> None:
         except (OSError, ValueError):
             pass
 
-    data[str(n)] = {"lb": lb, "pi": pi.tolist()}
+    key = str(n)
+    should_write = True
+    if key in data:
+        entry = data[key]
+        existing_iter = entry.get("hk_iter", 0)
+        existing_lb = entry.get("lb", entry.get("lower_bound", -np.inf))
+        if hk_iter < existing_iter and lb <= existing_lb:
+            should_write = False
 
-    try:
-        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with CACHE_PATH.open("w", encoding="utf-8") as f:
-            json.dump(data, f)
-    except OSError:
-        pass
+    if should_write:
+        data[key] = {"lb": lb, "pi": pi.tolist(), "hk_iter": hk_iter}
+        try:
+            CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with CACHE_PATH.open("w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except OSError:
+            pass
 
 
 @njit(cache=True, fastmath=True)  # type: ignore
@@ -304,7 +348,7 @@ def _compute_hk_impl(
         if iteration - last_improvement >= period:
             lambda_val *= 0.7
             last_improvement = iteration
-            if lambda_val < 0.0001:
+            if lambda_val < HK_MIN_LAMBDA:
                 break
         target = (
             min(upper_bound, best_lb * 1.05)
@@ -323,6 +367,8 @@ def compute_hk_lower_bound(
     initial_pi: npt.NDArray[np.float64] | None = None,
     target_ub: float = np.inf,
     sample_name: str | None = None,
+    *,
+    use_cache: bool = True,
 ) -> tuple[float, npt.NDArray[np.float64]]:
     """Compute the Held-Karp lower bound.
 
@@ -333,23 +379,29 @@ def compute_hk_lower_bound(
         initial_pi: Initial pi values for subgradient optimization.
         target_ub: Target upper bound for step size calculation.
         sample_name: Name of the sample for caching.
+        use_cache: Whether to load the cached bound if available.
 
     Returns:
         A tuple (lower_bound, pi_array).
     """
     n = coords.shape[0]
-    cached_json = load_hk_cache_json(n)
-    if cached_json is not None:
-        return cached_json
+    if use_cache:
+        cached_json = load_hk_cache_json(n, max_iter)
+        if cached_json is not None:
+            return cached_json
 
-    if sample_name:
-        cached = load_hk_cache(sample_name)
-        if cached:
-            save_hk_cache_json(n, cached[0], cached[1])
-            return cached
+        if sample_name:
+            cached = load_hk_cache(sample_name)
+            if cached:
+                save_hk_cache_json(n, cached[0], cached[1], max_iter)
+                return cached
 
     if initial_pi is None:
-        init_pi = np.zeros(n, dtype=np.float64)
+        init_pi = None
+        if use_cache:
+            init_pi = load_hk_cache_pi_only(n)
+        if init_pi is None:
+            init_pi = np.zeros(n, dtype=np.float64)
     else:
         init_pi = np.ascontiguousarray(initial_pi, dtype=np.float64)
 
@@ -357,7 +409,7 @@ def compute_hk_lower_bound(
         coords, candidate_set, max_iter, init_pi, target_ub
     )
 
-    save_hk_cache_json(n, best_lb, best_pi)
+    save_hk_cache_json(n, best_lb, best_pi, max_iter)
     if sample_name:
         save_hk_cache(sample_name, best_lb, best_pi)
 
