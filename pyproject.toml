@@ -87,6 +87,8 @@ ignore = [
 ]
 "src/scripts/run_sample.py" = [
     "PLR0913", # Too many arguments
+    "C901", # Too complex
+    "PLR0915", # Too many statements
 ]
 
 [tool.ruff.lint.pydocstyle]
