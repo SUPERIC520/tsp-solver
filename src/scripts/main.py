@@ -84,8 +84,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    start_total = time.time()
-
     # 1. Load Data
     coords_full = load_cities(str(DATA_PATH))
     total_cities = coords_full.shape[0]
@@ -129,14 +127,12 @@ def main() -> None:
         save_cached_hk_main(n, lb_val, pi_orig)
 
     # 2.6 Refinement
-    t0 = time.time()
     assert pi is not None
     assert (
         K_NEIGHBORS <= KD_TREE_QUERY_SIZE
     ), "K_NEIGHBORS must be <= KD_TREE_QUERY_SIZE for proper refinement"
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
     candidate_set = candidate_set[:, :K_NEIGHBORS]
-    time.time() - t0
 
     # 3. Seed Generation
     if args.start_tour:
@@ -148,7 +144,7 @@ def main() -> None:
         seeds = np.empty((args.seeds, n), dtype=np.int32)
         step = max(1, n // args.seeds)
         for i in range(args.seeds):
-            start_node = start_tour_new[i * step % n]
+            start_node = int(start_tour_new[i * step % n])
             seeds[i] = rotate_tour(start_tour_new, start_node)
     else:
         # Initial seeds are all Greedy NN from different starting points
@@ -214,7 +210,7 @@ def main() -> None:
         if global_best_tour_new is not None:
             step = max(1, n // args.seeds)
             for i in range(args.seeds):
-                start_node = global_best_tour_new[i * step % n]
+                start_node = int(global_best_tour_new[i * step % n])
                 seeds[i] = rotate_tour(global_best_tour_new, start_node)
 
     if global_best_tour_new is None:
@@ -235,8 +231,6 @@ def main() -> None:
             global_best_length,
             is_full_run=is_full_run,
         )
-
-    time.time() - start_total
 
 
 if __name__ == "__main__":

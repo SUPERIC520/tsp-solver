@@ -11,6 +11,7 @@ import numpy as np
 from numba import njit
 
 from src.config import NUM_PROCESSES_SEEDING
+from src.utils.memory_utils import ensure_alignment
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -70,34 +71,6 @@ def _greedy_nn_worker(args: tuple[np.ndarray, np.ndarray, int]) -> np.ndarray:
     """Worker function for parallel greedy NN seed generation."""
     coords, candidate_set, start_node = args
     return cast("np.ndarray", _greedy_nn_tour(coords, candidate_set, int(start_node)))
-
-
-def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
-    """Ensure the numpy array is C-contiguous and aligned.
-
-    Data pointer is aligned to the specified byte boundary.
-    If already aligned and contiguous, returns the array.
-    Otherwise, creates a new aligned array and copies the data.
-    """
-    arr = np.ascontiguousarray(arr)
-    if arr.size == 0:
-        return arr
-    if arr.ctypes.data % alignment == 0:
-        return arr
-
-    dtype = arr.dtype
-    shape = arr.shape
-    nbytes = arr.nbytes
-
-    raw = np.empty(nbytes + alignment, dtype=np.uint8)
-    start_address = raw.ctypes.data
-    offset = (alignment - (start_address % alignment)) % alignment
-
-    aligned_raw = raw[offset : offset + nbytes]
-    aligned_arr = aligned_raw.view(dtype).reshape(shape)
-    np.copyto(aligned_arr, arr)
-
-    return aligned_arr
 
 
 @njit(cache=True)  # type: ignore

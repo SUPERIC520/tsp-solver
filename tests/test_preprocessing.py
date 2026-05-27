@@ -11,10 +11,10 @@ import numpy as np
 
 from src.core.preprocessing import (
     build_candidate_sets,
-    ensure_alignment,
     hilbert_reorder_cities,
     refine_candidate_set_with_alpha,
 )
+from src.utils.memory_utils import ensure_alignment
 
 # ---------------------------------------------------------------------------
 # ensure_alignment

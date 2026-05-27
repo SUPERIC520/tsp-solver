@@ -85,6 +85,9 @@ ignore = [
     "PLR0915", # Too many statements
     "S101", # Use of `assert` detected
 ]
+"src/utils/memory_utils.py" = [
+    "S101", # Use of `assert` detected
+]
 "src/scripts/run_sample.py" = [
     "PLR0913", # Too many arguments
     "C901", # Too complex
@@ -101,6 +104,7 @@ addopts = "--strict-markers --strict-config -ra"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.409",
     "scipy-stubs>=1.17.1.5",
 ]
 

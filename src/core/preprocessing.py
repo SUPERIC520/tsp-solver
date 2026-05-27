@@ -5,14 +5,14 @@ building candidate sets using KD-Trees, and refining candidate sets using
 Alpha-values.
 """
 
-from typing import Any
-
 import numpy as np
+import numpy.typing as npt
 from numba import njit, prange
 from scipy.spatial import KDTree
 
 from src.config import K_NEIGHBORS, KD_TREE_QUERY_SIZE
 from src.core.validation import compute_alpha_values
+from src.utils.memory_utils import ensure_alignment
 
 
 @njit(cache=True)  # type: ignore
@@ -40,8 +40,8 @@ def _xy2d(n: int, x: int, y: int) -> int:
 
 @njit(cache=True)  # type: ignore
 def get_hilbert_indices(
-    coords: np.ndarray,
-) -> np.ndarray:
+    coords: npt.NDArray[np.float64],
+) -> npt.NDArray[np.int32]:
     """Sort indices based on Hilbert curve."""
     num_points = coords.shape[0]
     if num_points == 0:
@@ -76,33 +76,9 @@ def get_hilbert_indices(
     return np.argsort(hilbert_distances).astype(np.int32)
 
 
-def ensure_alignment(arr: np.ndarray, alignment: int = 64) -> np.ndarray:
-    """Ensure the input array is C-contiguous and aligned.
-
-    Data pointer is aligned to the specified byte boundary.
-    Uses the over-allocate-and-slice pattern to guarantee alignment.
-    If the array is already C-contiguous and aligned, returns it as-is.
-    If size == 0, returns the array without asserting alignment.
-    """
-    arr = np.ascontiguousarray(arr)
-    if arr.size == 0:
-        return arr
-    if arr.ctypes.data % alignment == 0:
-        return arr
-
-    nbytes = arr.nbytes
-    raw_buf = np.empty(nbytes + alignment, dtype=np.uint8)
-    addr = raw_buf.ctypes.data
-    offset = (alignment - (addr % alignment)) % alignment
-
-    aligned_buf = raw_buf[offset : offset + nbytes]
-    aligned_arr = np.ndarray(arr.shape, dtype=arr.dtype, buffer=aligned_buf)
-    np.copyto(aligned_arr, arr)
-
-    return aligned_arr
-
-
-def hilbert_reorder_cities(coords: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def hilbert_reorder_cities(
+    coords: npt.NDArray[np.float64],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int32]]:
     """Reorder cities according to a Hilbert curve to improve cache locality.
 
     Returns:
@@ -118,23 +94,23 @@ def hilbert_reorder_cities(coords: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     original_to_new = np.empty(n, dtype=np.int32)
     original_to_new[indices] = np.arange(n, dtype=np.int32)
 
-    reordered_coords = ensure_alignment(
+    reordered_coords_aligned = ensure_alignment(
         np.ascontiguousarray(reordered_coords.astype(np.float64)),
         alignment=64,
     )
-    original_to_new = ensure_alignment(
+    original_to_new_aligned = ensure_alignment(
         np.ascontiguousarray(original_to_new),
         alignment=64,
     )
 
-    return reordered_coords, original_to_new
+    return reordered_coords_aligned, original_to_new_aligned
 
 
 @njit(parallel=True, fastmath=True, cache=True)  # type: ignore
 def _sort_by_alpha(
-    candidate_set: np.ndarray[Any, np.dtype[np.int32]],
-    alpha_values: np.ndarray[Any, np.dtype[np.float64]],
-) -> np.ndarray[Any, np.dtype[np.int32]]:
+    candidate_set: npt.NDArray[np.int32],
+    alpha_values: npt.NDArray[np.float64],
+) -> npt.NDArray[np.int32]:
     n, k = candidate_set.shape
     refined = np.empty_like(candidate_set)
 
@@ -164,73 +140,78 @@ def _sort_by_alpha(
 
 
 def refine_candidate_set_with_alpha(
-    coords: np.ndarray[Any, np.dtype[np.float64]],
-    candidate_set: np.ndarray[Any, np.dtype[np.int32]],
-    pi: np.ndarray[Any, np.dtype[np.float64]],
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
+    pi: npt.NDArray[np.float64],
     top_k: int = K_NEIGHBORS,
-) -> np.ndarray[Any, np.dtype[np.int32]]:
+) -> npt.NDArray[np.int32]:
     """Re-sort candidate set based on Alpha-values.
 
     Small Alpha prioritised. Slices the result to the first ``top_k`` elements.
     Returns a 64-byte aligned C-contiguous array of shape (N, top_k), dtype int32.
     """
-    coords = ensure_alignment(
+    coords_aligned = ensure_alignment(
         np.ascontiguousarray(coords.astype(np.float64, copy=False)), alignment=64
     )
-    candidate_set = ensure_alignment(
+    candidate_set_aligned = ensure_alignment(
         np.ascontiguousarray(candidate_set.astype(np.int32, copy=False)), alignment=64
     )
-    pi = ensure_alignment(
+    pi_aligned = ensure_alignment(
         np.ascontiguousarray(pi.astype(np.float64, copy=False)), alignment=64
     )
 
-    n = coords.shape[0]
+    n = coords_aligned.shape[0]
     if n == 0:
-        empty: np.ndarray[Any, np.dtype[np.int32]] = ensure_alignment(
+        empty: npt.NDArray[np.int32] = ensure_alignment(
             np.empty((0, top_k), dtype=np.int32), alignment=64
         )
         return empty
 
-    alpha_values = compute_alpha_values(n, coords, candidate_set, pi)
-    refined = _sort_by_alpha(candidate_set, alpha_values)
+    alpha_values = compute_alpha_values(
+        n,
+        coords_aligned.astype(np.float64),
+        candidate_set_aligned.astype(np.int32),
+        pi_aligned.astype(np.float64),
+    )
+    refined = _sort_by_alpha(
+        candidate_set_aligned.astype(np.int32), alpha_values.astype(np.float64)
+    )
 
     c_cols = refined.shape[1]
     if c_cols == top_k:
-        sliced: np.ndarray[Any, np.dtype[np.int32]] = refined
+        sliced: npt.NDArray[np.int32] = refined
     elif c_cols > top_k:
         sliced = np.ascontiguousarray(refined[:, :top_k])
     else:
-        padded: np.ndarray[Any, np.dtype[np.int32]] = np.full(
-            (n, top_k), -1, dtype=np.int32
-        )
+        padded: npt.NDArray[np.int32] = np.full((n, top_k), -1, dtype=np.int32)
         padded[:, :c_cols] = refined
         sliced = padded
 
-    result: np.ndarray[Any, np.dtype[np.int32]] = ensure_alignment(
+    result: npt.NDArray[np.int32] = ensure_alignment(
         np.ascontiguousarray(sliced), alignment=64
     )
     return result
 
 
 def build_candidate_sets(
-    coords: np.ndarray, k: int = KD_TREE_QUERY_SIZE
-) -> np.ndarray:
+    coords: npt.NDArray[np.float64], k: int = KD_TREE_QUERY_SIZE
+) -> npt.NDArray[np.int32]:
     """Build candidate sets using KDTree nearest neighbors.
 
     Returns a 64-byte aligned C-contiguous matrix of shape (N, k), dtype int32.
     """
-    coords = ensure_alignment(
+    coords_aligned = ensure_alignment(
         np.ascontiguousarray(coords.astype(np.float64, copy=False)), alignment=64
     )
-    n = coords.shape[0]
+    n = coords_aligned.shape[0]
 
-    candidate_set: np.ndarray = np.full((n, k), -1, dtype=np.int32)
+    candidate_set: npt.NDArray[np.int32] = np.full((n, k), -1, dtype=np.int32)
     if n <= 1:
         return ensure_alignment(candidate_set, alignment=64)
 
-    tree = KDTree(coords)
+    tree = KDTree(coords_aligned)
     query_k = min(k + 1, n)
-    _, indices_raw = tree.query(coords, k=query_k)
+    _, indices_raw = tree.query(coords_aligned, k=query_k)
     indices = np.asarray(indices_raw)
 
     if indices.ndim == 1:
@@ -265,17 +246,15 @@ def build_candidate_sets(
                     # Replace the last KD-Tree neighbor if full
                     candidate_set[i, k - 1] = neighbor
 
-    return ensure_alignment(
-        np.ascontiguousarray(candidate_set), alignment=64
-    )
+    return ensure_alignment(np.ascontiguousarray(candidate_set), alignment=64)
 
 
 def refine_with_alpha(
-    coords: np.ndarray,
-    candidate_set: np.ndarray,
-    pi: np.ndarray,
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
+    pi: npt.NDArray[np.float64],
     top_k: int = K_NEIGHBORS,
-) -> np.ndarray:
+) -> npt.NDArray[np.int32]:
     """Re-sort the existing candidate set by Alpha-values.
 
     Delegates to refine_candidate_set_with_alpha.

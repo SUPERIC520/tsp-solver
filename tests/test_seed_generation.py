@@ -6,10 +6,10 @@ import pytest
 
 from src.core.preprocessing import build_candidate_sets
 from src.core.seed_generation import (
-    ensure_alignment,
     generate_greedy_nn_seeds,
     rotate_tour,
 )
+from src.utils.memory_utils import ensure_alignment
 
 
 def test_ensure_alignment() -> None:
@@ -133,35 +133,29 @@ def test_under_disabled_jit() -> None:
     )
 
     tour = np.array([5, 2, 7, 1], dtype=np.int32)
-    idx = _find_index_jit.py_func(tour, 7)
+    idx = _find_index_jit.py_func(tour, 7)  # pyright: ignore[reportFunctionMemberAccess]
     assert idx == 2
 
-    rotated = _rotate_tour_jit.py_func(tour, idx)
+    rotated = _rotate_tour_jit.py_func(tour, idx)  # pyright: ignore[reportFunctionMemberAccess]
     assert np.array_equal(rotated, [7, 1, 5, 2])
 
     # 2. Test greedy NN tour using the uncompiled py_func
-    coords = np.array([
-        [0.0, 0.0],
-        [1.0, 0.0],
-        [1.0, 1.0],
-        [0.0, 1.0]
-    ], dtype=np.float64)
-    candidate_set = np.array([
-        [1, 3, -1],
-        [0, 2, -1],
-        [1, 3, -1],
-        [0, 2, -1]
-    ], dtype=np.int32)
+    coords = np.array(
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], dtype=np.float64
+    )
+    candidate_set = np.array(
+        [[1, 3, -1], [0, 2, -1], [1, 3, -1], [0, 2, -1]], dtype=np.int32
+    )
 
     # Run uncompiled _greedy_nn_tour
-    tour_py = _greedy_nn_tour.py_func(coords, candidate_set, 0)
+    tour_py = _greedy_nn_tour.py_func(coords, candidate_set, 0)  # pyright: ignore[reportFunctionMemberAccess]
     assert len(np.unique(tour_py)) == 4
     assert tour_py[0] == 0
 
     # 3. Verify dynamically disabling JIT runs correctly
-    was_disabled = numba.config.DISABLE_JIT
+    was_disabled = numba.config.DISABLE_JIT  # pyright: ignore[reportAttributeAccessIssue]
     try:
-        numba.config.DISABLE_JIT = True
+        numba.config.DISABLE_JIT = True  # pyright: ignore[reportAttributeAccessIssue]
 
         # Test rotate_tour runs under disabled JIT config
         rotated_jit_disabled = rotate_tour(tour, 7)
@@ -173,4 +167,4 @@ def test_under_disabled_jit() -> None:
         for seed in seeds:
             assert len(np.unique(seed)) == 4
     finally:
-        numba.config.DISABLE_JIT = was_disabled
+        numba.config.DISABLE_JIT = was_disabled  # pyright: ignore[reportAttributeAccessIssue]

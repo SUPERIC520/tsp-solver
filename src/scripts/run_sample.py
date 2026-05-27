@@ -142,7 +142,7 @@ def run_benchmark(
         if global_best_tour_new is not None:
             step = max(1, n // num_seeds)
             for i in range(num_seeds):
-                start_node = global_best_tour_new[i * step % n]
+                start_node = int(global_best_tour_new[i * step % n])
                 seeds[i] = rotate_tour(global_best_tour_new, start_node)
 
     # 5. Validation

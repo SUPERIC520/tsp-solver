@@ -21,12 +21,12 @@ from src.core.kopt_engine import (
 @pytest.fixture(scope="module", autouse=True)
 def disable_numba_jit() -> Generator[None, None, None]:
     # Save original state
-    orig_disable_jit = numba.config.DISABLE_JIT
+    orig_disable_jit = numba.config.DISABLE_JIT  # pyright: ignore[reportAttributeAccessIssue]
     # Disable JIT
-    numba.config.DISABLE_JIT = True
+    numba.config.DISABLE_JIT = True  # pyright: ignore[reportAttributeAccessIssue]
     yield
     # Restore original state
-    numba.config.DISABLE_JIT = orig_disable_jit
+    numba.config.DISABLE_JIT = orig_disable_jit  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def _compute_candidate_dists(
@@ -192,7 +192,7 @@ def test_cascading_kopt_optimize() -> None:
     n = 20
     coords_x = np.random.rand(n)
     coords_y = np.random.rand(n)
-    tour = np.arange(n)
+    tour = np.arange(n, dtype=np.int32)
     np.random.shuffle(tour)
 
     candidate_set = np.full((n, n - 1), -1, dtype=np.int32)

@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 from numba import njit, prange
 
 from src.config import HK_BOUNDS_CACHE
@@ -19,7 +20,7 @@ _root = Path(__file__).resolve().parent.parent.parent
 CACHE_PATH = HK_BOUNDS_CACHE
 
 
-def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:
+def load_hk_cache_json(n: int) -> tuple[float, npt.NDArray[np.float64]] | None:
     """Load Held-Karp lower bound and pi values from JSON cache.
 
     Args:
@@ -48,7 +49,7 @@ def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:
     return None
 
 
-def save_hk_cache_json(n: int, lb: float, pi: np.ndarray) -> None:
+def save_hk_cache_json(n: int, lb: float, pi: npt.NDArray[np.float64]) -> None:
     """Save Held-Karp lower bound and pi values to JSON cache.
 
     Args:
@@ -75,7 +76,9 @@ def save_hk_cache_json(n: int, lb: float, pi: np.ndarray) -> None:
 
 
 @njit(cache=True, fastmath=True)  # type: ignore
-def _get_dist(i: int, j: int, coords: np.ndarray, pi: np.ndarray) -> float:
+def _get_dist(
+    i: int, j: int, coords: npt.NDArray[np.float64], pi: npt.NDArray[np.float64]
+) -> float:
     """Get transformed distance: d'(i,j) = d(i,j) + pi[i] + pi[j]."""
     dx = coords[i, 0] - coords[j, 0]
     dy = coords[i, 1] - coords[j, 1]
@@ -84,7 +87,11 @@ def _get_dist(i: int, j: int, coords: np.ndarray, pi: np.ndarray) -> float:
 
 @njit(cache=True, fastmath=True)  # type: ignore
 def _heap_push(
-    heap_val: np.ndarray, heap_node: np.ndarray, size: int, d: float, node: int
+    heap_val: npt.NDArray[np.float64],
+    heap_node: npt.NDArray[np.int32],
+    size: int,
+    d: float,
+    node: int,
 ) -> int:
     idx = size
     heap_val[idx] = d
@@ -103,7 +110,7 @@ def _heap_push(
 
 @njit(cache=True, fastmath=True)  # type: ignore
 def _heap_pop(
-    heap_val: np.ndarray, heap_node: np.ndarray, size: int
+    heap_val: npt.NDArray[np.float64], heap_node: npt.NDArray[np.int32], size: int
 ) -> tuple[float, int, int]:
     res_d = heap_val[0]
     res_node = heap_node[0]
@@ -129,17 +136,17 @@ def _heap_pop(
                 idx = smallest
             else:
                 break
-    return res_d, res_node, size
+    return res_d, int(res_node), size
 
 
 @njit(cache=True, fastmath=True)  # type: ignore
 def _build_undirected_adj(
-    n: int, candidate_set: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+    n: int, candidate_set: npt.NDArray[np.int32]
+) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     adj_ptr = np.zeros(n + 1, dtype=np.int32)
     for u in range(n):
         for k in range(candidate_set.shape[1]):
-            v = candidate_set[u, k]
+            v = int(candidate_set[u, k])
             if v == -1:
                 break
             adj_ptr[u + 1] += 1
@@ -148,12 +155,12 @@ def _build_undirected_adj(
     for i in range(n):
         adj_ptr[i + 1] += adj_ptr[i]
 
-    adj_indices = np.empty(adj_ptr[n], dtype=np.int32)
+    adj_indices = np.empty(int(adj_ptr[n]), dtype=np.int32)
     curr_ptr = adj_ptr.copy()
 
     for u in range(n):
         for k in range(candidate_set.shape[1]):
-            v = candidate_set[u, k]
+            v = int(candidate_set[u, k])
             if v == -1:
                 break
             adj_indices[curr_ptr[u]] = v
@@ -167,12 +174,12 @@ def _build_undirected_adj(
 @njit(cache=True, fastmath=True)  # type: ignore
 def compute_mst_weight(
     n: int,
-    coords: np.ndarray,
-    adj_ptr: np.ndarray,
-    adj_indices: np.ndarray,
-    pi: np.ndarray,
+    coords: npt.NDArray[np.float64],
+    adj_ptr: npt.NDArray[np.int32],
+    adj_indices: npt.NDArray[np.int32],
+    pi: npt.NDArray[np.float64],
     root: int,
-) -> tuple[float, np.ndarray, np.ndarray]:
+) -> tuple[float, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
     """Compute the Minimum Spanning Tree (MST) weight of a 1-tree relaxation.
 
     Args:
@@ -196,7 +203,7 @@ def compute_mst_weight(
     total_weight = 0.0
     degrees = np.zeros(n, dtype=np.int32)
 
-    max_heap_size = adj_ptr[n]
+    max_heap_size = int(adj_ptr[n])
     heap_val = np.empty(max_heap_size, dtype=np.float64)
     heap_node = np.empty(max_heap_size, dtype=np.int32)
     heap_size = 0
@@ -213,9 +220,9 @@ def compute_mst_weight(
         nodes_added += 1
         if parent[u] != -1:
             degrees[u] += 1
-            degrees[parent[u]] += 1
-        for k in range(adj_ptr[u], adj_ptr[u + 1]):
-            v = adj_indices[k]
+            degrees[int(parent[u])] += 1
+        for k in range(int(adj_ptr[u]), int(adj_ptr[u + 1])):
+            v = int(adj_indices[k])
             if v == root or visited[v]:
                 continue
             dist_uv = _get_dist(u, v, coords, pi)
@@ -230,12 +237,12 @@ def compute_mst_weight(
 
 @njit(cache=True, fastmath=True, parallel=True)  # type: ignore
 def _compute_hk_impl(
-    coords: np.ndarray,
-    candidate_set: np.ndarray,
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
     max_iter: int,
-    initial_pi: np.ndarray,
+    initial_pi: npt.NDArray[np.float64],
     target_ub: float,
-) -> tuple[float, np.ndarray]:
+) -> tuple[float, npt.NDArray[np.float64]]:
     n = coords.shape[0]
     coords = np.ascontiguousarray(coords)
     candidate_set = np.ascontiguousarray(candidate_set)
@@ -264,8 +271,8 @@ def _compute_hk_impl(
             return best_lb, best_pi
         d1, d2 = np.inf, np.inf
         n1, n2 = -1, -1
-        for k in range(adj_ptr[root], adj_ptr[root + 1]):
-            v = adj_indices[k]
+        for k in range(int(adj_ptr[root]), int(adj_ptr[root + 1])):
+            v = int(adj_indices[k])
             d = _get_dist(root, v, coords, pi)
             if d < d1:
                 d2 = d1
@@ -310,13 +317,13 @@ def _compute_hk_impl(
 
 
 def compute_hk_lower_bound(
-    coords: np.ndarray,
-    candidate_set: np.ndarray,
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
     max_iter: int = 500,
-    initial_pi: np.ndarray | None = None,
+    initial_pi: npt.NDArray[np.float64] | None = None,
     target_ub: float = np.inf,
     sample_name: str | None = None,
-) -> tuple[float, np.ndarray]:
+) -> tuple[float, npt.NDArray[np.float64]]:
     """Compute the Held-Karp lower bound.
 
     Args:
@@ -359,8 +366,11 @@ def compute_hk_lower_bound(
 
 @njit(cache=True, fastmath=True, parallel=True)  # type: ignore
 def compute_alpha_values(
-    n: int, coords: np.ndarray, candidate_set: np.ndarray, pi: np.ndarray
-) -> np.ndarray:
+    n: int,
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
+    pi: npt.NDArray[np.float64],
+) -> npt.NDArray[np.float64]:
     """Compute Alpha-values for candidate set refinement.
 
     Alpha-values measure the 'nearness' of an edge to the MST.
@@ -384,8 +394,8 @@ def compute_alpha_values(
     )
     d1, d2 = np.inf, np.inf
     n1, n2 = -1, -1
-    for k in range(adj_ptr[root], adj_ptr[root + 1]):
-        v = adj_indices[k]
+    for k in range(int(adj_ptr[root]), int(adj_ptr[root + 1])):
+        v = int(adj_indices[k])
         d = _get_dist(root, v, coords, pi)
         if d < d1:
             d2 = d1
@@ -400,16 +410,16 @@ def compute_alpha_values(
         if i == root or parent[i] == -1:
             continue
         mst_adj_ptr[i + 1] += 1
-        mst_adj_ptr[parent[i] + 1] += 1
+        mst_adj_ptr[int(parent[i]) + 1] += 1
     for i in range(n):
         mst_adj_ptr[i + 1] += mst_adj_ptr[i]
-    mst_adj_indices = np.empty(mst_adj_ptr[n], dtype=np.int32)
-    mst_adj_weights = np.empty(mst_adj_ptr[n], dtype=np.float64)
+    mst_adj_indices = np.empty(int(mst_adj_ptr[n]), dtype=np.int32)
+    mst_adj_weights = np.empty(int(mst_adj_ptr[n]), dtype=np.float64)
     curr_ptr = mst_adj_ptr.copy()
     for i in range(n):
         if i == root or parent[i] == -1:
             continue
-        p = parent[i]
+        p = int(parent[i])
         w = _get_dist(i, p, coords, pi)
         mst_adj_indices[curr_ptr[i]] = p
         mst_adj_weights[curr_ptr[i]] = w
@@ -429,10 +439,10 @@ def compute_alpha_values(
     tail += 1
     depth[start_node] = 1
     while head < tail:
-        u = queue[head]
+        u = int(queue[head])
         head += 1
-        for idx in range(mst_adj_ptr[u], mst_adj_ptr[u + 1]):
-            v = mst_adj_indices[idx]
+        for idx in range(int(mst_adj_ptr[u]), int(mst_adj_ptr[u + 1])):
+            v = int(mst_adj_indices[idx])
             if depth[v] == 0:
                 depth[v] = depth[u] + 1
                 up[v, 0] = u
@@ -442,8 +452,10 @@ def compute_alpha_values(
     for j in range(1, log_n):
         for i in range(n):
             if up[i, j - 1] != -1:
-                up[i, j] = up[up[i, j - 1], j - 1]
-                max_edge[i, j] = max(max_edge[i, j - 1], max_edge[up[i, j - 1], j - 1])
+                up[i, j] = up[int(up[i, j - 1]), j - 1]
+                max_edge[i, j] = max(
+                    max_edge[i, j - 1], max_edge[int(up[i, j - 1]), j - 1]
+                )
 
     num_cands = candidate_set.shape[1]
     alphas = np.full((n, num_cands), np.inf, dtype=np.float64)
@@ -457,15 +469,17 @@ def compute_alpha_values(
                 break
 
             v_idx = np.int32(v_node)
-            if root in (u_idx, v_idx):
-                val_other = v_idx if u_idx == root else u_idx
+            if root in (int(u_idx), int(v_idx)):
+                val_other = int(v_idx) if int(u_idx) == root else int(u_idx)
                 if val_other in (n1, n2):
-                    alphas[u_idx, cand_k] = 0.0
+                    alphas[int(u_idx), cand_k] = 0.0
                 else:
-                    alphas[u_idx, cand_k] = _get_dist(root, val_other, coords, pi) - d2
+                    alphas[int(u_idx), cand_k] = (
+                        _get_dist(root, val_other, coords, pi) - d2
+                    )
             else:
-                curr_u = u_idx
-                curr_v = v_idx
+                curr_u = int(u_idx)
+                curr_v = int(v_idx)
                 if depth[curr_u] < depth[curr_v]:
                     curr_u, curr_v = curr_v, curr_u
 
@@ -474,19 +488,21 @@ def compute_alpha_values(
                 for lca_step in range(log_n):
                     if (diff >> lca_step) & 1:
                         max_e = max(max_e, max_edge[curr_u, lca_step])
-                        curr_u = up[curr_u, lca_step]
+                        curr_u = int(up[curr_u, lca_step])
 
                 if curr_u != curr_v:
                     for lca_step in range(log_n - 1, -1, -1):
                         if up[curr_u, lca_step] != up[curr_v, lca_step]:
                             max_e = max(max_e, max_edge[curr_u, lca_step])
                             max_e = max(max_e, max_edge[curr_v, lca_step])
-                            curr_u = up[curr_u, lca_step]
-                            curr_v = up[curr_v, lca_step]
+                            curr_u = int(up[curr_u, lca_step])
+                            curr_v = int(up[curr_v, lca_step])
                     max_e = max(max_e, max_edge[curr_u, 0])
                     max_e = max(max_e, max_edge[curr_v, 0])
 
-                alphas[u_idx, cand_k] = _get_dist(u_idx, v_idx, coords, pi) - max_e
+                alphas[int(u_idx), cand_k] = (
+                    _get_dist(int(u_idx), int(v_idx), coords, pi) - max_e
+                )
     return alphas
 
 
