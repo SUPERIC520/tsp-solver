@@ -1,6 +1,6 @@
-# LKH+ TSP Solver - Technical Specifications
+# TSP Solver - Technical Specifications
 
-This repository contains a high-performance Traveling Salesperson Problem (TSP) solver based on the Lin-Kernighan-Helsgaun heuristic, optimized with Numba and parallelized for large-scale datasets.
+This repository contains a high-performance Traveling Salesperson Problem (TSP) solver based on cascading k-opt heuristic, optimized with Numba, and parallelized for large-scale datasets.
 
 ## How to Use
 
