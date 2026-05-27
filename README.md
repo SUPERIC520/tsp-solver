@@ -5,11 +5,29 @@ This repository contains a high-performance Traveling Salesperson Problem (TSP) 
 ## How to Use
 
 ### 1. Environment Setup
-The project uses `uv` for dependency management. Ensure you have `uv` installed, then synchronize the environment:
 
+#### Option A: `uv`
 ```powershell
 uv sync
 ```
+
+#### Option B: `pip` and `venv`
+```powershell
+# Create and activate a virtual environment
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# Unix/macOS:
+source .venv/bin/activate
+
+# Install production dependencies
+pip install .
+
+# Install development tools
+pip install -e ".[dev]"
+```
+
+*Note: Core dependencies include Numba, NumPy, and SciPy. Development tools (Mypy, Ruff, Pytest, Pyright) are in the `dev` group.*
 
 ### 2. Basic Execution (Main Solver)
 The main production script orchestrates the full pipeline: loading cities, computing lower bounds, and running parallel K-opt optimization.
@@ -21,11 +39,13 @@ uv run python -m src.scripts.main --n 500 --kicks 100 --iters 1 --seeds 8
 
 #### Key Arguments:
 *   `--n`: Number of cities to sample from the dataset (0 for all).
-*   `--kicks`: Number of double-bridge kicks per seed (higher is better, slower).
+*   `--kicks`: Number of double-bridge kicks per seed.
 *   `--seeds`: Number of parallel optimization starts.
-*   `--iters`: Number of full re-optimization passes.
-*   `--max_opt`: Maximum K-opt level (default 3, scales to 5).
+*   `--iters`: Number of full re-optimization passes (0 for infinite).
+*   `--max_opt`: Maximum K-opt level (default 3, range [2, 5]).
 *   `--hk_iter`: Iterations for Held-Karp lower bound computation.
+*   `--no_cache`: Disable using cached Held-Karp results.
+*   `--start_tour`: Path to a tour CSV/text file to initialize optimization.
 
 ### 3. Benchmarking
 Use the `run_sample` script to evaluate performance and log results to `notes.md`.
