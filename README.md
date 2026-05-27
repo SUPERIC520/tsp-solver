@@ -1,6 +1,59 @@
 # LKH+ TSP Solver - Technical Specifications
 
-This document outlines the architectural configurations, mathematical boundaries, and algorithmic specifications of the project.
+This repository contains a high-performance Traveling Salesperson Problem (TSP) solver based on the Lin-Kernighan-Helsgaun heuristic, optimized with Numba and parallelized for large-scale datasets.
+
+## How to Use
+
+### 1. Environment Setup
+The project uses `uv` for dependency management. Ensure you have `uv` installed, then synchronize the environment:
+
+```powershell
+uv sync
+```
+
+### 2. Basic Execution (Main Solver)
+The main production script orchestrates the full pipeline: loading cities, computing lower bounds, and running parallel K-opt optimization.
+
+```powershell
+# Run on a subset of 500 cities for a quick test
+uv run python -m src.scripts.main --n 500 --kicks 100 --iters 1 --seeds 8
+```
+
+#### Key Arguments:
+*   `--n`: Number of cities to sample from the dataset (0 for all).
+*   `--kicks`: Number of double-bridge kicks per seed (higher is better, slower).
+*   `--seeds`: Number of parallel optimization starts.
+*   `--iters`: Number of full re-optimization passes.
+*   `--max_opt`: Maximum K-opt level (default 3, scales to 5).
+*   `--hk_iter`: Iterations for Held-Karp lower bound computation.
+
+### 3. Benchmarking
+Use the `run_sample` script to evaluate performance and log results to `notes.md`.
+
+```powershell
+uv run python -m src.scripts.run_sample --n 1000 --kicks 500 --iters 3
+```
+
+### 4. Verification and Quality Control
+The project maintains strict standards for type safety and linting:
+
+```powershell
+# Run unit tests
+uv run pytest
+
+# Run strict type checking
+uv run mypy --strict src tests
+uv run pyright src tests
+
+# Run linter
+uv run ruff check .
+```
+
+### 5. Data Outputs
+*   `data/solutions.csv`: Contains the results of the current run.
+*   `data/best_tour.csv`: Stores the global best tour found (only updated during full-scale runs).
+
+---
 
 ## 1. Mathematical Foundations and Objective Formulation
 
