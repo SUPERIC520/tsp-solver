@@ -81,13 +81,13 @@ uv run ruff check .
 The Traveling Salesperson Problem (TSP) on a graph $G = (V, E)$ with vertex set $V = \{1, 2, \dots, n\}$ and edge costs $c_{ij}$ for $(i,j) \in E$ is formulated using decision variables $x_{ij} \in \{0, 1\}$. The variable $x_{ij} = 1$ if edge $(i, j)$ is included in the tour, and $x_{ij} = 0$ otherwise.
 
 Objective function:
-$$ \min \sum_{(i,j) \in E} c_{ij} x_{ij} $$
+$$\min \sum_{(i,j) \in E} c_{ij} x_{ij}$$
 
 Subject to degree constraints:
-$$ \sum_{j \in V, j \neq i} x_{ij} = 2 \quad \forall i \in V $$
+$$\sum_{j \in V, j \neq i} x_{ij} = 2 \quad \forall i \in V$$
 
 Subject to subtour elimination constraints (SECs):
-$$ \sum_{i,j \in S} x_{ij} \le |S| - 1 \quad \forall S \subset V, 2 \le |S| \le n-1 $$
+$$\sum_{i,j \in S} x_{ij} \le |S| - 1 \quad \forall S \subset V, 2 \le |S| \le n-1$$
 
 ### 1-Tree Relaxation
 A 1-tree is defined as a spanning tree on the vertex set $V \setminus \{1\}$, combined with exactly two edges connecting vertex 1 to the spanning tree. The set of all 1-trees is denoted as $\mathcal{T}$. A TSP tour is a 1-tree where every vertex $i \in V$ has a degree equal to 2. The algorithm relaxes the degree constraints for all vertices while maintaining the requirement that the subgraph forms a 1-tree.
@@ -96,27 +96,27 @@ A 1-tree is defined as a spanning tree on the vertex set $V \setminus \{1\}$, co
 The degree constraints $\sum_{j} x_{ij} = 2$ are moved into the objective function using a vector of Lagrange multipliers $\pi = (\pi_1, \pi_2, \dots, \pi_n) \in \mathbb{R}^n$.
 
 The modified edge costs, $c'_{ij}$, are defined as:
-$$ c'_{ij} = c_{ij} + \pi_i + \pi_j $$
+$$c'_{ij} = c_{ij} + \pi_i + \pi_j$$
 
 The Lagrangian function $L(\pi)$ is computed by finding the minimum weight 1-tree with respect to $c'_{ij}$:
-$$ L(\pi) = \min_{x \in \mathcal{T}} \sum_{(i,j) \in E} (c_{ij} + \pi_i + \pi_j) x_{ij} - 2\sum_{i \in V} \pi_i $$
-$$ L(\pi) = \left( \min_{x \in \mathcal{T}} \sum_{(i,j) \in E} c'_{ij} x_{ij} \right) - 2\sum_{i \in V} \pi_i $$
+$$L(\pi) = \min_{x \in \mathcal{T}} \sum_{(i,j) \in E} (c_{ij} + \pi_i + \pi_j) x_{ij} - 2\sum_{i \in V} \pi_i$$
+$$L(\pi) = \left( \min_{x \in \mathcal{T}} \sum_{(i,j) \in E} c'_{ij} x_{ij} \right) - 2\sum_{i \in V} \pi_i$$
 
 The Dual Problem maximizes this formulation:
-$$ \max_{\pi \in \mathbb{R}^n} L(\pi) $$
+$$\max_{\pi \in \mathbb{R}^n} L(\pi)$$
 
 ### Subgradient Ascent and $\pi$ Vector Computation
 The dual problem is non-differentiable. Subgradient ascent is utilized to iteratively update the $\pi$ vector. Let $x^{(k)}$ be the minimum 1-tree computed at iteration $k$ using weights $c'_{ij}$ derived from $\pi^{(k)}$.
 
 The degree of vertex $i$ in the 1-tree $x^{(k)}$ is denoted as $d_i^{(k)} = \sum_{j} x_{ij}^{(k)}$.
 The subgradient vector $g^{(k)}$ has components defined as:
-$$ g_i^{(k)} = d_i^{(k)} - 2 $$
+$$g_i^{(k)} = d_i^{(k)} - 2$$
 
 The multipliers are updated using the formula:
-$$ \pi_i^{(k+1)} = \pi_i^{(k)} + t_k \cdot g_i^{(k)} $$
+$$\pi_i^{(k+1)} = \pi_i^{(k)} + t_k \cdot g_i^{(k)}$$
 
 The step size $t_k$ is computed using the formulation:
-$$ t_k = \lambda_k \frac{UB - L(\pi^{(k)})}{\sum_{i \in V} (g_i^{(k)})^2} $$
+$$t_k = \lambda_k \frac{UB - L(\pi^{(k)})}{\sum_{i \in V} (g_i^{(k)})^2}$$
 where $UB$ is the length of a previously computed tour and $\lambda_k$ is a scalar parameter initialized at $2$ and halved if $L(\pi)$ fails to increase after a predetermined number of iterations.
 
 ### Algorithmic Evaluation of the Relaxation
