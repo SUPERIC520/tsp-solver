@@ -11,8 +11,6 @@ The project uses `uv` for dependency management. Ensure you have `uv` installed,
 uv sync
 ```
 
-*Note: Standard dependencies include Numba, NumPy, and SciPy. Development tools (Mypy, Ruff, Pytest, Pyright) are isolated in the `dev` dependency group.*
-
 ### 2. Basic Execution (Main Solver)
 The main production script orchestrates the full pipeline: loading cities, computing lower bounds, and running parallel K-opt optimization.
 
@@ -25,11 +23,9 @@ uv run python -m src.scripts.main --n 500 --kicks 100 --iters 1 --seeds 8
 *   `--n`: Number of cities to sample from the dataset (0 for all).
 *   `--kicks`: Number of double-bridge kicks per seed (higher is better, slower).
 *   `--seeds`: Number of parallel optimization starts.
-*   `--iters`: Number of full re-optimization passes (0 for infinite).
-*   `--max_opt`: Maximum K-opt level (default 3, scales up to 5).
+*   `--iters`: Number of full re-optimization passes.
+*   `--max_opt`: Maximum K-opt level (default 3, scales to 5).
 *   `--hk_iter`: Iterations for Held-Karp lower bound computation.
-*   `--no_cache`: Disable using cached Held-Karp results.
-*   `--start_tour`: Path to an existing tour CSV/text file to resume optimization from.
 
 ### 3. Benchmarking
 Use the `run_sample` script to evaluate performance and log results to `notes.md`.
