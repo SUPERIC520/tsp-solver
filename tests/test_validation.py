@@ -70,7 +70,6 @@ def test_alpha_values_shape() -> None:
 
 
 def test_hk_bound_precision_and_cache() -> None:
-    import os
 
     # 5 points in a line — use a fresh unique set of coords to avoid N=5 cache collision
     # We use N=6 to avoid caching overlap with test_hk_lower_bound_small (N=5)
@@ -117,15 +116,15 @@ def test_hk_bound_precision_and_cache() -> None:
 
     from src.core.validation import CACHE_PATH
 
-    if os.path.exists(CACHE_PATH):
+    if CACHE_PATH.exists():
         try:
-            with open(CACHE_PATH) as f:
+            with CACHE_PATH.open("r", encoding="utf-8") as f:
                 data = json.load(f)
             if str(dummy_n) in data:
                 del data[str(dummy_n)]
-                with open(CACHE_PATH, "w") as f:
+                with CACHE_PATH.open("w", encoding="utf-8") as f:
                     json.dump(data, f)
-        except Exception:
+        except (OSError, ValueError):
             pass
 
 

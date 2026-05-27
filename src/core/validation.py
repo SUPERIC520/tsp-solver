@@ -11,11 +11,12 @@ from pathlib import Path
 import numpy as np
 from numba import njit, prange
 
+from src.config import HK_BOUNDS_CACHE
 from src.utils.data_io import load_hk_cache, save_hk_cache
 
 # Project root is two levels up from src/core/validation.py
 _root = Path(__file__).resolve().parent.parent.parent
-CACHE_PATH = _root / ".cache" / "hk_bounds.json"
+CACHE_PATH = HK_BOUNDS_CACHE
 
 
 def load_hk_cache_json(n: int) -> tuple[float, np.ndarray] | None:

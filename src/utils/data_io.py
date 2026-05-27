@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.config import CACHE_VERSION
+from src.config import CACHE_DIR, CACHE_VERSION
 
 
 def load_cities(filepath: str) -> np.ndarray:
@@ -140,9 +140,10 @@ def get_hk_cache_paths(sample_name: str) -> tuple[str, str]:
     Returns:
         tuple[str, str]: (bound_path, pi_path).
     """
-    bound_path = f"data/cache/{CACHE_VERSION}/sample_{sample_name}_hk.npy"
-    pi_path = f"data/cache/{CACHE_VERSION}/sample_{sample_name}_pi.npy"
-    return bound_path, pi_path
+    cache_subdir = CACHE_DIR / CACHE_VERSION
+    bound_path = cache_subdir / f"sample_{sample_name}_hk.npy"
+    pi_path = cache_subdir / f"sample_{sample_name}_pi.npy"
+    return str(bound_path), str(pi_path)
 
 
 def load_hk_cache(sample_name: str) -> tuple[float, np.ndarray] | None:

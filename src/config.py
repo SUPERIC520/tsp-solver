@@ -21,7 +21,25 @@ def _get_cache_version() -> str:
 # Path to the primary city coordinates dataset
 DATA_PATH: Path = Path("data/cities.csv")
 
-# Cache version for generated artifacts (e.g. .npy bounds).
+# Path to the sample city coordinates dataset for testing
+SAMPLE_DATA_PATH: Path = Path("tests/data/sample_cities.csv")
+
+# Path to the results file for the current run
+SOLUTIONS_PATH: Path = Path("data/solutions.csv")
+
+# Path to the global best tour file
+BEST_TOUR_PATH: Path = Path("data/best_tour.csv")
+
+# Path to the research notes file
+NOTES_PATH: Path = Path("notes.md")
+
+# Directory for generated artifacts (e.g. .npy bounds)
+CACHE_DIR: Path = Path("data/cache")
+
+# Path to the Held-Karp bounds JSON cache
+HK_BOUNDS_CACHE: Path = Path(".cache/hk_bounds.json")
+
+# Cache version for generated artifacts
 CACHE_VERSION: str = _get_cache_version()
 
 # Initial KD-Tree neighbor query count

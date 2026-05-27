@@ -8,11 +8,18 @@ parallel K-Opt optimization, and results persistence.
 import argparse
 import multiprocessing as mp
 import time
-from pathlib import Path
 
 import numpy as np
 
-from src.config import CACHE_VERSION, DATA_PATH, K_NEIGHBORS, KD_TREE_QUERY_SIZE
+from src.config import (
+    BEST_TOUR_PATH,
+    CACHE_DIR,
+    CACHE_VERSION,
+    DATA_PATH,
+    K_NEIGHBORS,
+    KD_TREE_QUERY_SIZE,
+    SOLUTIONS_PATH,
+)
 from src.core.orchestration import parallel_solve
 from src.core.preprocessing import (
     build_candidate_sets,
@@ -33,9 +40,9 @@ def save_cached_hk_main(n: int, hk: float, pi: np.ndarray) -> None:
         hk: Computed lower bound.
         pi: Computed pi vector.
     """
-    cache_dir = Path(f"data/cache/{CACHE_VERSION}")
-    hk_file = cache_dir / f"sample_{n}_hk.npy"
-    pi_file = cache_dir / f"sample_{n}_pi.npy"
+    cache_subdir = CACHE_DIR / CACHE_VERSION
+    hk_file = cache_subdir / f"sample_{n}_hk.npy"
+    pi_file = cache_subdir / f"sample_{n}_pi.npy"
     hk_file.parent.mkdir(parents=True, exist_ok=True)
     np.save(hk_file, np.array([hk]))
     np.save(pi_file, pi)
@@ -104,9 +111,9 @@ def main() -> None:
 
     # Try loading cache by default
     if not args.no_cache:
-        cache_dir = Path(f"data/cache/{CACHE_VERSION}")
-        hk_npy = cache_dir / f"sample_{n}_hk.npy"
-        pi_npy = cache_dir / f"sample_{n}_pi.npy"
+        cache_subdir = CACHE_DIR / CACHE_VERSION
+        hk_npy = cache_subdir / f"sample_{n}_hk.npy"
+        pi_npy = cache_subdir / f"sample_{n}_pi.npy"
         if hk_npy.exists() and pi_npy.exists():
             lb_val = float(np.load(hk_npy)[0])
             pi_orig = np.load(pi_npy)
@@ -190,11 +197,11 @@ def main() -> None:
             if global_best_tour_new is not None:
                 temp_best_tour = new_to_orig[global_best_tour_new]
                 save_solution_csv(
-                    "data/solutions.csv", temp_best_tour, global_best_length
+                    str(SOLUTIONS_PATH), temp_best_tour, global_best_length
                 )
                 if is_full_run:
                     update_best_tour(
-                        "data/best_tour.csv",
+                        str(BEST_TOUR_PATH),
                         temp_best_tour,
                         global_best_length,
                         is_full_run=is_full_run,
@@ -220,10 +227,10 @@ def main() -> None:
     validate_result(global_best_length, lb_val)
 
     # 6. Save Results
-    save_solution_csv("data/solutions.csv", best_tour, global_best_length)
+    save_solution_csv(str(SOLUTIONS_PATH), best_tour, global_best_length)
     if is_full_run:
         update_best_tour(
-            "data/best_tour.csv",
+            str(BEST_TOUR_PATH),
             best_tour,
             global_best_length,
             is_full_run=is_full_run,

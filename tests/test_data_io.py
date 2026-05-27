@@ -5,13 +5,14 @@ from typing import Any
 
 import numpy as np
 
+from src.config import SAMPLE_DATA_PATH
 from src.core.kopt_engine import compute_tour_length
 from src.utils.data_io import load_cities, load_tour, save_tour
 
 
 def test_load_cities() -> None:
     """Test loading city coordinates from a CSV file."""
-    filepath = "tests/data/sample_cities.csv"
+    filepath = str(SAMPLE_DATA_PATH)
     coords = load_cities(filepath)
 
     assert coords.shape == (5, 2)

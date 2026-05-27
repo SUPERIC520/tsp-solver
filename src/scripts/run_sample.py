@@ -6,11 +6,10 @@ performance on subsets of the city data.
 
 import argparse
 import time
-from pathlib import Path
 
 import numpy as np
 
-from src.config import DATA_PATH
+from src.config import BEST_TOUR_PATH, DATA_PATH, NOTES_PATH, SOLUTIONS_PATH
 from src.core.kopt_engine import cascading_kopt_optimize
 from src.core.orchestration import parallel_solve
 from src.core.preprocessing import (
@@ -126,11 +125,11 @@ def run_benchmark(
             if global_best_tour_new is not None:
                 temp_best_tour = new_to_orig[global_best_tour_new]
                 save_solution_csv(
-                    "data/solutions.csv", temp_best_tour, global_best_length
+                    str(SOLUTIONS_PATH), temp_best_tour, global_best_length
                 )
                 if is_full_run:
                     update_best_tour(
-                        "data/best_tour.csv",
+                        str(BEST_TOUR_PATH),
                         temp_best_tour,
                         global_best_length,
                         is_full_run=is_full_run,
@@ -154,10 +153,10 @@ def run_benchmark(
     best_tour = new_to_orig[global_best_tour_new]
 
     # Save final results
-    save_solution_csv("data/solutions.csv", best_tour, global_best_length)
+    save_solution_csv(str(SOLUTIONS_PATH), best_tour, global_best_length)
     if is_full_run:
         update_best_tour(
-            "data/best_tour.csv",
+            str(BEST_TOUR_PATH),
             best_tour,
             global_best_length,
             is_full_run=is_full_run,
@@ -168,8 +167,7 @@ def run_benchmark(
     total_time = time.time() - start_total
 
     # Log to notes.md (append)
-    notes_path = Path("notes.md")
-    with notes_path.open("a", encoding="utf-8") as f:
+    with NOTES_PATH.open("a", encoding="utf-8") as f:
         timestamp = time.strftime("%Y-%m-%d %H:%M")
         f.write(f"\n## [{timestamp}] - Benchmark N={n_sample} (Refined Architecture)\n")
         f.write(
