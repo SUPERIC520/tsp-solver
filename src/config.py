@@ -1,6 +1,5 @@
 """Global configuration constants for the TSP solver."""
 
-
 from pathlib import Path
 
 
@@ -17,6 +16,7 @@ def _get_cache_version() -> str:
             return ref[:7]
     except (OSError, IndexError):
         return "default"
+
 
 # Path to the primary city coordinates dataset
 DATA_PATH: Path = Path("data/cities.csv")

@@ -85,8 +85,8 @@ def _find_index_jit(arr: np.ndarray, val: int) -> int:
 def _rotate_tour_jit(tour: np.ndarray, start_idx: int) -> np.ndarray:
     n = tour.shape[0]
     out = np.empty(n, dtype=np.int32)
-    out[:n - start_idx] = tour[start_idx:]
-    out[n - start_idx:] = tour[:start_idx]
+    out[: n - start_idx] = tour[start_idx:]
+    out[n - start_idx :] = tour[:start_idx]
     return out
 
 

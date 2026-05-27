@@ -47,9 +47,7 @@ def compute_tour_length(
     length = 0.0
     n = tour.shape[0]
     for i in range(n):
-        length += _dist(
-            int(tour[i]), int(tour[(i + 1) % n]), coords_x, coords_y
-        )
+        length += _dist(int(tour[i]), int(tour[(i + 1) % n]), coords_x, coords_y)
     return float(length)
 
 
@@ -636,9 +634,7 @@ def _optimize_4opt_sequential(
                             t7 = int(candidate_set[t6, k7])
                             if t7 == -1:
                                 break
-                            if (
-                                t7 in (t1, t2, t3, t4, t5, t6)
-                            ):
+                            if t7 in (t1, t2, t3, t4, t5, t6):
                                 continue
                             dist_t6_t7 = float(candidate_dists[t6, k7])
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
@@ -649,9 +645,7 @@ def _optimize_4opt_sequential(
                             for d3 in [1, -1]:
                                 t8_idx = (t7_idx + d3 + n) % n
                                 t8 = int(tour[t8_idx])
-                                if (
-                                    t8 in (t1, t2, t3, t4, t5, t6, t7)
-                                ):
+                                if t8 in (t1, t2, t3, t4, t5, t6, t7):
                                     continue
                                 dist_t7_t8 = _dist(t7, t8, coords_x, coords_y)
 
@@ -772,9 +766,7 @@ def _optimize_5opt_sequential(
                             t7 = int(candidate_set[t6, k7])
                             if t7 == -1:
                                 break
-                            if (
-                                t7 in (t1, t2, t3, t4, t5, t6)
-                            ):
+                            if t7 in (t1, t2, t3, t4, t5, t6):
                                 continue
                             dist_t6_t7 = float(candidate_dists[t6, k7])
                             g3 = g2 + dist_t5_t6 - dist_t6_t7
@@ -785,9 +777,7 @@ def _optimize_5opt_sequential(
                             for d3 in [1, -1]:
                                 t8_idx = (t7_idx + d3 + n) % n
                                 t8 = int(tour[t8_idx])
-                                if (
-                                    t8 in (t1, t2, t3, t4, t5, t6, t7)
-                                ):
+                                if t8 in (t1, t2, t3, t4, t5, t6, t7):
                                     continue
                                 dist_t7_t8 = _dist(t7, t8, coords_x, coords_y)
 
@@ -795,9 +785,7 @@ def _optimize_5opt_sequential(
                                     t9 = int(candidate_set[t8, k9])
                                     if t9 == -1:
                                         break
-                                    if (
-                                        t9 in (t1, t2, t3, t4, t5, t6, t7, t8)
-                                    ):
+                                    if t9 in (t1, t2, t3, t4, t5, t6, t7, t8):
                                         continue
                                     dist_t8_t9 = float(candidate_dists[t8, k9])
                                     g4 = g3 + dist_t7_t8 - dist_t8_t9
@@ -808,9 +796,7 @@ def _optimize_5opt_sequential(
                                     for d4 in [1, -1]:
                                         t10_idx = (t9_idx + d4 + n) % n
                                         t10 = int(tour[t10_idx])
-                                        if (
-                                            t10 in (t1, t2, t3, t4, t5, t6, t7, t8, t9)
-                                        ):
+                                        if t10 in (t1, t2, t3, t4, t5, t6, t7, t8, t9):
                                             continue
                                         dist_t9_t10 = _dist(t9, t10, coords_x, coords_y)
 
@@ -902,7 +888,13 @@ def _full_cascade(
 
         # Or-opt search
         if _optimize_or_opt(
-            tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb,
+            tour,
+            coords_x,
+            coords_y,
+            candidate_set,
+            candidate_dists,
+            pos,
+            dlb,
             max_len=OR_OPT_MAX_LEN,
         ):
             improved = True
@@ -1078,18 +1070,12 @@ def cascading_kopt_optimize(
     budget.
     """
     # Force C-contiguity and 64-byte alignment on input arrays
-    coords_x = ensure_alignment(
-        np.ascontiguousarray(coords_x, dtype=np.float64)
-    )
-    coords_y = ensure_alignment(
-        np.ascontiguousarray(coords_y, dtype=np.float64)
-    )
+    coords_x = ensure_alignment(np.ascontiguousarray(coords_x, dtype=np.float64))
+    coords_y = ensure_alignment(np.ascontiguousarray(coords_y, dtype=np.float64))
     candidate_set = ensure_alignment(
         np.ascontiguousarray(candidate_set, dtype=np.int32)
     )
-    initial_tour = ensure_alignment(
-        np.ascontiguousarray(initial_tour, dtype=np.int32)
-    )
+    initial_tour = ensure_alignment(np.ascontiguousarray(initial_tour, dtype=np.int32))
 
     # Assert alignments and layouts
     assert coords_x.flags["C_CONTIGUOUS"]

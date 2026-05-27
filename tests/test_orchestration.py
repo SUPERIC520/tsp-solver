@@ -18,9 +18,7 @@ def test_parallel_solve_basic() -> None:
 
     np.full((n, 2), -1, dtype=np.int32)
 
-    results = parallel_solve(
-        seeds, coords, candidate_set, num_processes=2
-    )
+    results = parallel_solve(seeds, coords, candidate_set, num_processes=2)
 
     assert len(results) == 4
     for tour, length in results:
@@ -38,9 +36,7 @@ def test_parallel_solve_no_locked_edges() -> None:
     for i in range(n):
         candidate_set[i, :4] = np.random.choice(n, 4, replace=False)
 
-    results = parallel_solve(
-        seeds, coords, candidate_set, num_processes=2
-    )
+    results = parallel_solve(seeds, coords, candidate_set, num_processes=2)
 
     assert len(results) == 4
     for tour, length in results:
@@ -96,9 +92,7 @@ def test_parallel_solve_failure_recovery() -> None:
     # during parsing in the worker
     invalid_candidate_set = np.full((n, 5), "invalid", dtype=object)
 
-    results = parallel_solve(
-        seeds, coords, invalid_candidate_set, num_processes=2
-    )
+    results = parallel_solve(seeds, coords, invalid_candidate_set, num_processes=2)
 
     # It must catch the exception, terminate the pool, and return the
     # intermediate results

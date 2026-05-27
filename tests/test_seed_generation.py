@@ -69,13 +69,9 @@ def test_rotate_tour_edge_cases() -> None:
 
 def test_generate_greedy_nn_seeds() -> None:
     # Setup coordinates and candidate sets
-    coords = np.array([
-        [0.0, 0.0],
-        [1.0, 0.0],
-        [1.0, 1.0],
-        [0.0, 1.0],
-        [0.5, 0.5]
-    ], dtype=np.float64)
+    coords = np.array(
+        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.5, 0.5]], dtype=np.float64
+    )
 
     candidate_set = build_candidate_sets(coords, k=3)
 

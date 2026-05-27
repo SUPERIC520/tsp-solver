@@ -38,6 +38,4 @@ def warmup_numba_jit() -> None:
         candidate_set[i, : len(cands)] = cands
 
     # This single call compiles all JIT-decorated kernels used by tests
-    cascading_kopt_optimize(
-        tour, coords_x, coords_y, candidate_set, num_kicks=1
-    )
+    cascading_kopt_optimize(tour, coords_x, coords_y, candidate_set, num_kicks=1)

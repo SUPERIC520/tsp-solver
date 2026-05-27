@@ -69,6 +69,7 @@ def run_benchmark(
     start_total = time.time()
 
     # 1. Load Data
+    print(f"\n--- Benchmarking {n_sample} cities ---")  # noqa: T201
     coords_full = load_cities(str(DATA_PATH))
     total_cities = coords_full.shape[0]
 
@@ -77,6 +78,7 @@ def run_benchmark(
 
     # Check if we are running on full data for persistence
     is_full_run = n == total_cities
+    print(f"Loaded {n} cities.")  # noqa: T201
 
     # 1.5 Hilbert Reorder
     coords, orig_to_new = hilbert_reorder_cities(coords_orig)
@@ -84,22 +86,38 @@ def run_benchmark(
     new_to_orig[orig_to_new] = np.arange(n, dtype=np.int32)
 
     # 2. Preprocessing
+    print("Step 2: Building initial candidate sets (Delaunay+KDTree)...")  # noqa: T201
+    start_pre = time.time()
     candidate_set = build_candidate_sets(coords, k=64)
+    print(f"Initial preprocessing done in {time.time() - start_pre:.2f}s.")  # noqa: T201
 
+    print(  # noqa: T201
+        "Step 2.5: Refining candidate sets with Alpha-values "
+        f"(HK max_iter={hk_iter})..."
+    )
+    start_alpha = time.time()
     lb_val, pi = compute_hk_lower_bound(coords, candidate_set, max_iter=hk_iter)
 
     candidate_set = refine_candidate_set_with_alpha(coords, candidate_set, pi)
     # Keep top 40 after refinement
     candidate_set = candidate_set[:, :40]
+    print(  # noqa: T201
+        "Alpha refinement done in "
+        f"{time.time() - start_alpha:.2f}s. "
+        f"HK Lower Bound: {lb_val:.2f}"
+    )
 
     # 3. Seed Generation
+    print(f"Step 3: Generating {num_seeds} Greedy NN seeds...")  # noqa: T201
     seeds = generate_greedy_nn_seeds(coords, candidate_set, num_seeds=num_seeds)
 
     # 4. Iterative Optimization
     global_best_length = np.inf
     global_best_tour_new = None
 
-    for _iter_idx in range(num_iterations):
+    for iter_idx in range(num_iterations):
+        print(f"\nIteration {iter_idx + 1}/{num_iterations}")  # noqa: T201
+        start_iter = time.time()
         results = parallel_solve(
             seeds,
             coords,
@@ -107,6 +125,7 @@ def run_benchmark(
             num_kicks=num_kicks,
             max_opt=max_opt,
         )
+        print(f"Parallel solve completed in {time.time() - start_iter:.2f}s.")  # noqa: T201
 
         iter_best_tour = None
         iter_best_length = np.inf
@@ -137,6 +156,8 @@ def run_benchmark(
         else:
             pass
 
+        print(f"Best length so far: {global_best_length:.2f}")  # noqa: T201
+
         # [HLD 3.3] 100% Exploit strategy using rotated versions of the best tour
         # for next seeds
         if global_best_tour_new is not None:
@@ -146,6 +167,7 @@ def run_benchmark(
                 seeds[i] = rotate_tour(global_best_tour_new, start_node)
 
     # 5. Validation
+    print("\nStep 5: Validation")  # noqa: T201
     if global_best_tour_new is None:
         return 0.0, 0.0
 
@@ -163,8 +185,12 @@ def run_benchmark(
         )
 
     gap = validate_result(global_best_length, lb_val)
+    print(f"Final Best Length: {global_best_length:.2f}")  # noqa: T201
+    print(f"HK Lower Bound: {lb_val:.2f}")  # noqa: T201
+    print(f"Gap: {gap:.4f}%")  # noqa: T201
 
     total_time = time.time() - start_total
+    print(f"Total execution time: {total_time:.2f}s")  # noqa: T201
 
     # Log to notes.md (append)
     with NOTES_PATH.open("a", encoding="utf-8") as f:

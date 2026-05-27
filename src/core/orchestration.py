@@ -145,6 +145,10 @@ def parallel_solve(
                     results.append((result[0], result[1]))
                     completed[i] = True
                     sys.stdout.write("\r" + " " * 120 + "\r")
+                    print(  # noqa: T201
+                        f"  - Completed seed {len(results)}/{num_seeds} "
+                        f"(Length: {result[1]:.2f})"
+                    )
 
             if not all(completed):
                 time.sleep(0.1)
