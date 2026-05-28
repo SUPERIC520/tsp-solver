@@ -387,7 +387,7 @@ To verify algorithmic correctness and support step-by-step debugger validation:
     import os
     os.environ["NUMBA_DISABLE_JIT"] = "1"
     ```
-*   This disables Numba compile passes, running JIT functions as raw Python. Key operations, such as `_apply_2opt` and `_reconstruct_tour_3opt`, are fully testable as pure Python functions.
+*   This disables Numba compile passes, running JIT functions as raw Python. Key operations, such as `_reverse_segment` and `_reconstruct_tour_3opt`, are fully testable as pure Python functions.
 
 ### 6.2 Regression and Scale Verification Plan
 All algorithm checks must progress sequentially by scale, checking correct convergence behavior before increasing dataset sizes:

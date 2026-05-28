@@ -69,6 +69,18 @@ MIN_TOUR_SIZE_4OPT: int = 8
 MIN_TOUR_SIZE_5OPT: int = 10
 MIN_TOUR_SIZE_KICK: int = 8
 
+# Time budget safety margin (e.g. 0.97 means stop at 97% of total time)
+TIME_SAFETY_MARGIN: float = 0.97
+
+# ILS stagnation limit parameters
+STAGNATION_LIMIT_MIN: int = 50
+STAGNATION_LIMIT_DIVISOR: int = 100
+
+# Localized kick window scaling parameters
+LOCALIZED_KICK_W_MIN: int = 100
+LOCALIZED_KICK_W_MAX: int = 500
+LOCALIZED_KICK_W_DIVISOR: int = 20
+
 # CPU process count for solver concurrency, default -1 to use CPU cores
 NUM_PROCESSES_SOLVER: int = -1
 

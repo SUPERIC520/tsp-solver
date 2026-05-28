@@ -12,27 +12,27 @@ import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
 
-from src.config import K_NEIGHBORS, MAX_OPT, GAIN_EPSILON, K_3OPT, K_4OPT, K_5OPT, OR_OPT_MAX_LEN, LOCALIZED_KICK_THRESHOLD, MIN_TOUR_SIZE_2OPT, MIN_TOUR_SIZE_3OPT, MIN_TOUR_SIZE_4OPT, MIN_TOUR_SIZE_5OPT, MIN_TOUR_SIZE_KICK
-# Maximum local search cascade depth level
-MAX_OPT: int = 5
-
+from src.config import (
+    GAIN_EPSILON,
+    K_3OPT,
+    K_4OPT,
+    K_5OPT,
+    K_NEIGHBORS,
+    LOCALIZED_KICK_THRESHOLD,
+    LOCALIZED_KICK_W_DIVISOR,
+    LOCALIZED_KICK_W_MAX,
+    LOCALIZED_KICK_W_MIN,
+    MIN_TOUR_SIZE_2OPT,
+    MIN_TOUR_SIZE_3OPT,
+    MIN_TOUR_SIZE_4OPT,
+    MIN_TOUR_SIZE_5OPT,
+    MIN_TOUR_SIZE_KICK,
+    OR_OPT_MAX_LEN,
+    STAGNATION_LIMIT_DIVISOR,
+    STAGNATION_LIMIT_MIN,
+    TIME_SAFETY_MARGIN,
+)
 from src.utils.memory_utils import ensure_alignment
-
-
-# Optimization levels
-OPT_LEVEL_3: int = 3
-OPT_LEVEL_4: int = 4
-OPT_LEVEL_5: int = 5
-
-# 3-opt edge reconnection case indices
-CASE_1: int = 1
-CASE_2: int = 2
-CASE_3: int = 3
-CASE_4: int = 4
-CASE_5: int = 5
-CASE_6: int = 6
-CASE_7: int = 7
-CASE_8: int = 8
 
 
 @njit(inline="always", fastmath=True)  # type: ignore
@@ -71,23 +71,38 @@ def compute_tour_length(
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
-def _apply_2opt(tour: npt.NDArray[np.int32], i: int, j: int) -> None:
-    n = tour.shape[0]
-    if i == j:
-        return
-    # Reverse segment from i to j (inclusive)
-    size = (j - i + n) % n + 1
-    count = size // 2
-    for k in range(count):
-        idx1 = (i + k) % n
-        idx2 = (j - k + n) % n
-        tour[idx1], tour[idx2] = tour[idx2], tour[idx1]
-
-
-@njit(fastmath=True, cache=True)  # type: ignore
 def _update_pos(tour: npt.NDArray[np.int32], pos: npt.NDArray[np.int32]) -> None:
     for i in range(tour.shape[0]):
         pos[int(tour[i])] = i
+
+
+@njit(fastmath=True, cache=True)  # type: ignore
+def _reverse_segment(tour: npt.NDArray[np.int32], i: int, j: int) -> None:
+    n = tour.shape[0]
+    i = i % n
+    j = j % n
+    # Reverse segment from i (inclusive) to j (exclusive)
+    size = (j - i + n) % n
+    if size <= 1:
+        return
+    if i < j:
+        count = size // 2
+        for k in range(count):
+            idx1 = i + k
+            idx2 = j - 1 - k
+            tour[idx1], tour[idx2] = tour[idx2], tour[idx1]
+    else:
+        count = size // 2
+        idx1 = i
+        idx2 = (j - 1 + n) % n
+        for _k in range(count):
+            tour[idx1], tour[idx2] = tour[idx2], tour[idx1]
+            idx1 += 1
+            if idx1 == n:
+                idx1 = 0
+            idx2 -= 1
+            if idx2 == -1:
+                idx2 = n - 1
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -136,7 +151,7 @@ def _optimize_2opt(
                 dist_uv + _dist(w, x, coords_x, coords_y)
                 > dist_uw + _dist(v, x, coords_x, coords_y) + GAIN_EPSILON
             ):
-                _apply_2opt(tour, v_idx, w_idx)
+                _reverse_segment(tour, v_idx, (w_idx + 1) % n)
                 _update_pos(tour, pos)
                 dlb[u] = dlb[v] = dlb[w] = dlb[x] = False
                 globally_improved = True
@@ -161,11 +176,7 @@ def _reconstruct_tour_3opt(
     idx_2: int,
     idx_3: int,
     case_idx: int,
-) -> npt.NDArray[np.int32]:
-    n = tour.shape[0]
-    new_tour = np.empty_like(tour)
-    curr = 0
-
+) -> None:
     # Sort indices
     i1, i2, i3 = idx_1, idx_2, idx_3
     if i1 > i2:
@@ -180,80 +191,30 @@ def _reconstruct_tour_3opt(
     # S2: from i2 + 1 to i3 (inclusive)
     # S3: from i3 + 1 to i1 (inclusive, wrapping around)
 
-    if case_idx == CASE_4:
-        # S1 + S2_rev + S3_rev
-        for i in range(i1 + 1, i2 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-        for i in range(i2 + 1, i3 + 1):
-            idx = i3 - (i - (i2 + 1))
-            new_tour[curr] = tour[idx]
-            curr += 1
-        L3 = (i1 - i3 + n) % n
-        for k in range(L3):
-            idx = (i1 - k + n) % n
-            new_tour[curr] = tour[idx]
-            curr += 1
+    match case_idx:
+        case 1:
+            pass
+        case 2:
+            _reverse_segment(tour, i1 + 1, i2 + 1)
+        case 3:
+            _reverse_segment(tour, i2 + 1, i3 + 1)
+        case 4:
+            _reverse_segment(tour, i3 + 1, i1 + 1)
+        case 5:
+            _reverse_segment(tour, i2 + 1, i3 + 1)
+            _reverse_segment(tour, i3 + 1, i1 + 1)
+        case 6:
+            _reverse_segment(tour, i2 + 1, i3 + 1)
+            _reverse_segment(tour, i3 + 1, i1 + 1)
+            _reverse_segment(tour, i2 + 1, i1 + 1)
+        case 7:
+            _reverse_segment(tour, i2 + 1, i3 + 1)
+            _reverse_segment(tour, i2 + 1, i1 + 1)
+        case 8:
+            _reverse_segment(tour, i3 + 1, i1 + 1)
+            _reverse_segment(tour, i2 + 1, i1 + 1)
 
-    elif case_idx == CASE_5:
-        # S1 + S3 + S2
-        for i in range(i1 + 1, i2 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-        L3 = (i1 - i3 + n) % n
-        for k in range(L3):
-            idx = (i3 + 1 + k) % n
-            new_tour[curr] = tour[idx]
-            curr += 1
-        for i in range(i2 + 1, i3 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
 
-    elif case_idx == CASE_6:
-        # S1 + S3_rev + S2
-        for i in range(i1 + 1, i2 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-        L3 = (i1 - i3 + n) % n
-        for k in range(L3):
-            idx = (i1 - k + n) % n
-            new_tour[curr] = tour[idx]
-            curr += 1
-        for i in range(i2 + 1, i3 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-
-    elif case_idx == CASE_7:
-        # S1 + S3 + S2_rev
-        for i in range(i1 + 1, i2 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-        L3 = (i1 - i3 + n) % n
-        for k in range(L3):
-            idx = (i3 + 1 + k) % n
-            new_tour[curr] = tour[idx]
-            curr += 1
-        for i in range(i2 + 1, i3 + 1):
-            idx = i3 - (i - (i2 + 1))
-            new_tour[curr] = tour[idx]
-            curr += 1
-
-    elif case_idx == CASE_8:
-        # S1 + S3_rev + S2_rev
-        for i in range(i1 + 1, i2 + 1):
-            new_tour[curr] = tour[i]
-            curr += 1
-        L3 = (i1 - i3 + n) % n
-        for k in range(L3):
-            idx = (i1 - k + n) % n
-            new_tour[curr] = tour[idx]
-            curr += 1
-        for i in range(i2 + 1, i3 + 1):
-            idx = i3 - (i - (i2 + 1))
-            new_tour[curr] = tour[idx]
-            curr += 1
-
-    return new_tour
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -355,66 +316,85 @@ def _optimize_3opt_sequential(
                         best_case = -1
                         best_delta = -GAIN_EPSILON
 
-                        # Case 4
-                        d4 = (
+                        # Case 2 (2-opt reversing S1)
+                        delta2 = (
+                            _dist(a, c, coords_x, coords_y)
+                            + _dist(b, d, coords_x, coords_y)
+                            - _dist(a, b, coords_x, coords_y)
+                            - _dist(c, d, coords_x, coords_y)
+                        )
+                        if delta2 < best_delta:
+                            best_delta = delta2
+                            best_case = 2
+
+                        # Case 3 (2-opt reversing S2)
+                        delta3 = (
+                            _dist(c, e, coords_x, coords_y)
+                            + _dist(d, f, coords_x, coords_y)
+                            - _dist(c, d, coords_x, coords_y)
+                            - _dist(e, f, coords_x, coords_y)
+                        )
+                        if delta3 < best_delta:
+                            best_delta = delta3
+                            best_case = 3
+
+                        # Case 4 (2-opt reversing S3)
+                        delta4 = (
+                            _dist(e, a, coords_x, coords_y)
+                            + _dist(f, b, coords_x, coords_y)
+                            - _dist(e, f, coords_x, coords_y)
+                            - _dist(a, b, coords_x, coords_y)
+                        )
+                        if delta4 < best_delta:
+                            best_delta = delta4
+                            best_case = 4
+
+                        # Case 5 (3-opt S1 + S2_rev + S3_rev)
+                        delta5 = (
                             _dist(c, e, coords_x, coords_y)
                             + _dist(d, a, coords_x, coords_y)
                             + _dist(f, b, coords_x, coords_y)
                             - E_remove
                         )
-                        if d4 < best_delta:
-                            best_delta = d4
-                            best_case = CASE_4
+                        if delta5 < best_delta:
+                            best_delta = delta5
+                            best_case = 5
 
-                        # Case 5
-                        d5 = (
+                        # Case 6 (3-opt S1 + S3 + S2)
+                        delta6 = (
                             _dist(c, f, coords_x, coords_y)
                             + _dist(a, d, coords_x, coords_y)
                             + _dist(e, b, coords_x, coords_y)
                             - E_remove
                         )
-                        if d5 < best_delta:
-                            best_delta = d5
-                            best_case = CASE_5
+                        if delta6 < best_delta:
+                            best_delta = delta6
+                            best_case = 6
 
-                        # Case 6
-                        d6 = (
+                        # Case 7 (3-opt S1 + S3_rev + S2)
+                        delta7 = (
                             _dist(c, a, coords_x, coords_y)
                             + _dist(f, d, coords_x, coords_y)
                             + _dist(e, b, coords_x, coords_y)
                             - E_remove
                         )
-                        if d6 < best_delta:
-                            best_delta = d6
-                            best_case = CASE_6
+                        if delta7 < best_delta:
+                            best_delta = delta7
+                            best_case = 7
 
-                        # Case 7
-                        d7 = (
+                        # Case 8 (3-opt S1 + S3 + S2_rev)
+                        delta8 = (
                             _dist(c, f, coords_x, coords_y)
                             + _dist(a, e, coords_x, coords_y)
                             + _dist(d, b, coords_x, coords_y)
                             - E_remove
                         )
-                        if d7 < best_delta:
-                            best_delta = d7
-                            best_case = CASE_7
-
-                        # Case 8
-                        d8 = (
-                            _dist(c, a, coords_x, coords_y)
-                            + _dist(f, e, coords_x, coords_y)
-                            + _dist(d, b, coords_x, coords_y)
-                            - E_remove
-                        )
-                        if d8 < best_delta:
-                            best_delta = d8
-                            best_case = CASE_8
+                        if delta8 < best_delta:
+                            best_delta = delta8
+                            best_case = 8
 
                         if best_case != -1:
-                            new_tour = _reconstruct_tour_3opt(
-                                tour, i1, i2, i3, best_case
-                            )
-                            tour[:] = new_tour[:]
+                            _reconstruct_tour_3opt(tour, i1, i2, i3, best_case)
                             _update_pos(tour, pos)
 
                             dlb[a] = dlb[b] = dlb[c] = dlb[d] = dlb[e] = dlb[f] = False
@@ -446,8 +426,7 @@ def _optimize_or_opt(
     n = tour.shape[0]
     globally_improved = False
 
-    K_NEIGHBORS_OR = 40
-    num_cand = min(candidate_set.shape[1], K_NEIGHBORS_OR)
+    num_cand = min(candidate_set.shape[1], K_NEIGHBORS)
 
     for i_idx in range(n):
         u = int(tour[i_idx])
@@ -497,20 +476,19 @@ def _optimize_or_opt(
                 dist_wu = float(candidate_dists[u, k])
                 if (
                     base_g + _dist(w, s_w, coords_x, coords_y)
-                    > dist_wu + _dist(v, s_w, coords_x, coords_y) + 1e-9
+                    > dist_wu + _dist(v, s_w, coords_x, coords_y) + GAIN_EPSILON
                 ):
                     # Relocate segment [u, v] (indices i_idx to j_idx) to after w
                     if i_idx <= j_idx < w_idx:
-                        _apply_2opt(tour, i_idx, j_idx)
-                        _apply_2opt(tour, s_v_idx, w_idx)
-                        _apply_2opt(tour, i_idx, w_idx)
+                        _reverse_segment(tour, i_idx, (j_idx + 1) % n)
+                        _reverse_segment(tour, s_v_idx, (w_idx + 1) % n)
+                        _reverse_segment(tour, i_idx, (w_idx + 1) % n)
                     elif w_idx < i_idx <= j_idx:
-                        _apply_2opt(tour, i_idx, j_idx)
-                        _apply_2opt(tour, s_w_idx, p_u_idx)
-                        _apply_2opt(tour, s_w_idx, j_idx)
+                        _reverse_segment(tour, i_idx, (j_idx + 1) % n)
+                        _reverse_segment(tour, s_w_idx, (p_u_idx + 1) % n)
+                        _reverse_segment(tour, s_w_idx, (j_idx + 1) % n)
                     else:
                         continue
-
                     _update_pos(tour, pos)
                     dlb[p_u] = dlb[u] = dlb[v] = dlb[s_v] = dlb[w] = dlb[s_w] = False
                     globally_improved = True
@@ -543,17 +521,16 @@ def _optimize_or_opt(
                     dist_wv = float(candidate_dists[v, k])
                     if (
                         base_g + _dist(w, s_w, coords_x, coords_y)
-                        > dist_wv + _dist(u, s_w, coords_x, coords_y) + 1e-9
+                        > dist_wv + _dist(u, s_w, coords_x, coords_y) + GAIN_EPSILON
                     ):
                         if i_idx <= j_idx < w_idx:
-                            _apply_2opt(tour, s_v_idx, w_idx)
-                            _apply_2opt(tour, i_idx, w_idx)
+                            _reverse_segment(tour, s_v_idx, (w_idx + 1) % n)
+                            _reverse_segment(tour, i_idx, (w_idx + 1) % n)
                         elif w_idx < i_idx <= j_idx:
-                            _apply_2opt(tour, s_w_idx, p_u_idx)
-                            _apply_2opt(tour, s_w_idx, j_idx)
+                            _reverse_segment(tour, s_w_idx, (p_u_idx + 1) % n)
+                            _reverse_segment(tour, s_w_idx, (j_idx + 1) % n)
                         else:
                             continue
-
                         _update_pos(tour, pos)
                         dlb[p_u] = dlb[u] = dlb[v] = dlb[s_v] = dlb[w] = dlb[s_w] = (
                             False
@@ -568,7 +545,7 @@ def _optimize_or_opt(
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
-def _apply_2opt_indices(
+def _reverse_segment_between_cuts(
     tour: npt.NDArray[np.int32],
     t1_idx: int,
     t2_idx: int,
@@ -577,9 +554,9 @@ def _apply_2opt_indices(
 ) -> None:
     n = tour.shape[0]
     if (t1_idx + 1) % n == t2_idx:
-        _apply_2opt(tour, t2_idx, t3_idx)
+        _reverse_segment(tour, t2_idx, (t3_idx + 1) % n)
     else:
-        _apply_2opt(tour, t1_idx, t4_idx)
+        _reverse_segment(tour, t1_idx, (t4_idx + 1) % n)
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -671,19 +648,21 @@ def _optimize_4opt_sequential(
                                 g4_part = g3 + dist_t7_t8
                                 gain = g4_part - _dist(t8, t1, coords_x, coords_y)
                                 if gain > GAIN_EPSILON:
-                                    _apply_2opt_indices(
-                                        tour, t1_idx, t2_idx, t3_idx, t4_idx
+                                    _reverse_segment_between_cuts(
+                                        tour,
+                                        t1_idx,
+                                        t2_idx,
+                                        t3_idx,
+                                        t4_idx,
                                     )
-                                    _update_pos(tour, pos)
-                                    _apply_2opt_indices(
+                                    _reverse_segment_between_cuts(
                                         tour,
                                         int(pos[t1]),
                                         int(pos[t4]),
                                         int(pos[t5]),
                                         int(pos[t6]),
                                     )
-                                    _update_pos(tour, pos)
-                                    _apply_2opt_indices(
+                                    _reverse_segment_between_cuts(
                                         tour,
                                         int(pos[t1]),
                                         int(pos[t6]),
@@ -824,27 +803,28 @@ def _optimize_5opt_sequential(
                                             t10, t1, coords_x, coords_y
                                         )
                                         if gain > GAIN_EPSILON:
-                                            _apply_2opt_indices(
-                                                tour, t1_idx, t2_idx, t3_idx, t4_idx
+                                            _reverse_segment_between_cuts(
+                                                tour,
+                                                t1_idx,
+                                                t2_idx,
+                                                t3_idx,
+                                                t4_idx,
                                             )
-                                            _update_pos(tour, pos)
-                                            _apply_2opt_indices(
+                                            _reverse_segment_between_cuts(
                                                 tour,
                                                 int(pos[t1]),
                                                 int(pos[t4]),
                                                 int(pos[t5]),
                                                 int(pos[t6]),
                                             )
-                                            _update_pos(tour, pos)
-                                            _apply_2opt_indices(
+                                            _reverse_segment_between_cuts(
                                                 tour,
                                                 int(pos[t1]),
                                                 int(pos[t6]),
                                                 int(pos[t7]),
                                                 int(pos[t8]),
                                             )
-                                            _update_pos(tour, pos)
-                                            _apply_2opt_indices(
+                                            _reverse_segment_between_cuts(
                                                 tour,
                                                 int(pos[t1]),
                                                 int(pos[t8]),
@@ -920,19 +900,19 @@ def _full_cascade(
             continue
 
         # Or-opt and 3-opt sequential
-        if max_opt >= OPT_LEVEL_3 and _optimize_3opt_sequential(
+        if max_opt >= 3 and _optimize_3opt_sequential(  # noqa: PLR2004
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
             continue
 
-        if max_opt >= OPT_LEVEL_4 and _optimize_4opt_sequential(
+        if max_opt >= 4 and _optimize_4opt_sequential(  # noqa: PLR2004
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
             continue
 
-        if max_opt >= OPT_LEVEL_5 and _optimize_5opt_sequential(
+        if max_opt >= 5 and _optimize_5opt_sequential(  # noqa: PLR2004
             tour, coords_x, coords_y, candidate_set, candidate_dists, pos, dlb
         ):
             improved = True
@@ -940,7 +920,9 @@ def _full_cascade(
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
-def _double_bridge_kick(tour: npt.NDArray[np.int32]) -> None:
+def _double_bridge_kick(
+    tour: npt.NDArray[np.int32], pos: npt.NDArray[np.int32]
+) -> None:
     n = tour.shape[0]
     if n < MIN_TOUR_SIZE_KICK:
         return
@@ -959,7 +941,10 @@ def _double_bridge_kick(tour: npt.NDArray[np.int32]) -> None:
         )
     else:
         # Localized kick
-        W = min(500, max(100, n // 20))
+        W = min(
+            LOCALIZED_KICK_W_MAX,
+            max(LOCALIZED_KICK_W_MIN, n // LOCALIZED_KICK_W_DIVISOR),
+        )
         start = np.random.randint(0, n - W)  # noqa: NPY002
         offsets = np.random.choice(W, 4, replace=False)  # noqa: NPY002
         offsets.sort()
@@ -968,26 +953,18 @@ def _double_bridge_kick(tour: npt.NDArray[np.int32]) -> None:
         p3 = int(start + offsets[2])
         p4 = int(start + offsets[3])
 
-    # Tour segments: [0, p1], [p1+1, p2], [p2+1, p3], [p3+1, p4], [p4+1, n-1]
     # Reconnect as: [0, p1], [p3+1, p4], [p2+1, p3], [p1+1, p2], [p4+1, n-1]
-    new_tour = np.empty_like(tour)
-    curr = 0
-    for i in range(p1 + 1):
-        new_tour[curr] = tour[i]
-        curr += 1
-    for i in range(p3 + 1, p4 + 1):
-        new_tour[curr] = tour[i]
-        curr += 1
-    for i in range(p2 + 1, p3 + 1):
-        new_tour[curr] = tour[i]
-        curr += 1
-    for i in range(p1 + 1, p2 + 1):
-        new_tour[curr] = tour[i]
-        curr += 1
-    for i in range(p4 + 1, n):
-        new_tour[curr] = tour[i]
-        curr += 1
-    tour[:] = new_tour[:]
+    # This is equivalent to reversing the segments B, C, D and then B+C+D in-place:
+    # B: p1 + 1 to p2 (inclusive) -> reverse_segment(tour, p1 + 1, p2 + 1)
+    # C: p2 + 1 to p3 (inclusive) -> reverse_segment(tour, p2 + 1, p3 + 1)
+    # D: p3 + 1 to p4 (inclusive) -> reverse_segment(tour, p3 + 1, p4 + 1)
+    # B+C+D: p1 + 1 to p4 (inclusive) -> reverse_segment(tour, p1 + 1, p4 + 1)
+    _reverse_segment(tour, p1 + 1, p2 + 1)
+    _reverse_segment(tour, p2 + 1, p3 + 1)
+    _reverse_segment(tour, p3 + 1, p4 + 1)
+    _reverse_segment(tour, p1 + 1, p4 + 1)
+    _update_pos(tour, pos)
+
 
 
 @njit(fastmath=True, cache=True)  # type: ignore
@@ -998,10 +975,15 @@ def _cascading_kopt_inner(
     candidate_dists: npt.NDArray[np.float64],
     chunk_size: int,
     max_opt: int,
-    in_tour: npt.NDArray[np.int32],
-    in_best_tour: npt.NDArray[np.int32],
-    in_best_length: float,
-    in_stagnation_count: int,
+    tour: npt.NDArray[np.int32],
+    best_tour: npt.NDArray[np.int32],
+    best_length: float,
+    stagnation_count: int,
+    kicked_tour: npt.NDArray[np.int32],
+    pos: npt.NDArray[np.int32],
+    best_pos: npt.NDArray[np.int32],
+    kicked_pos: npt.NDArray[np.int32],
+    dlb: npt.NDArray[np.bool_],
 ) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32], float, int]:
     """Inner @njit kick loop.
 
@@ -1009,21 +991,13 @@ def _cascading_kopt_inner(
     wrapper can resume across chunk boundaries. Returns updated
     (tour, best_tour, best_length, stagnation_count).
     """
-    n = in_tour.shape[0]
-    tour = in_tour.copy()
-    best_tour = in_best_tour.copy()
-    best_length = in_best_length
-    stagnation_count = in_stagnation_count
-    stagnation_limit = max(50, n // 100)
-
-    pos = np.empty(n, dtype=np.int32)
-    _update_pos(tour, pos)
-    dlb = np.zeros(n, dtype=np.bool_)
+    n = tour.shape[0]
+    stagnation_limit = max(STAGNATION_LIMIT_MIN, n // STAGNATION_LIMIT_DIVISOR)
 
     for _i in range(chunk_size):
-        kicked_tour = tour.copy()
-        _double_bridge_kick(kicked_tour)
-        _update_pos(kicked_tour, pos)
+        kicked_tour[:] = tour[:]
+        kicked_pos[:] = pos[:]
+        _double_bridge_kick(kicked_tour, kicked_pos)
         dlb.fill(False)  # noqa: FBT003
         _full_cascade(
             kicked_tour,
@@ -1031,20 +1005,23 @@ def _cascading_kopt_inner(
             coords_y,
             candidate_set,
             candidate_dists,
-            pos,
+            kicked_pos,
             dlb,
             max_opt=max_opt,
         )
         length = compute_tour_length(kicked_tour, coords_x, coords_y)
-        if length < best_length - 1e-9:
+        if length < best_length - GAIN_EPSILON:
             best_length = length
-            best_tour = kicked_tour.copy()
-            tour = kicked_tour
+            best_tour[:] = kicked_tour[:]
+            best_pos[:] = kicked_pos[:]
+            tour[:] = kicked_tour[:]
+            pos[:] = kicked_pos[:]
             stagnation_count = 0
         else:
             stagnation_count += 1
             if stagnation_count > stagnation_limit:
-                tour = best_tour.copy()
+                tour[:] = best_tour[:]
+                pos[:] = best_pos[:]
                 dlb.fill(False)  # noqa: FBT003  # CRITICAL: clear DLB after reset!
                 stagnation_count = 0
 
@@ -1117,10 +1094,11 @@ def cascading_kopt_optimize(
     assert candidate_dists.flags["C_CONTIGUOUS"]
     assert candidate_dists.ctypes.data % 64 == 0
 
-    tour = initial_tour.copy()
-    pos = np.empty(n, dtype=np.int32)
-    _update_pos(tour, pos)
-    dlb = np.zeros(n, dtype=np.bool_)
+    tour = ensure_alignment(initial_tour.copy())
+    pos = ensure_alignment(np.empty(n, dtype=np.int32))
+    for i in range(n):
+        pos[int(tour[i])] = i
+    dlb = ensure_alignment(np.zeros(n, dtype=np.bool_))
 
     # Initial local search before kicks
     _full_cascade(
@@ -1134,12 +1112,19 @@ def cascading_kopt_optimize(
         max_opt=max_opt,
     )
 
-    best_tour = tour.copy()
+    best_tour = ensure_alignment(tour.copy())
+    best_pos = ensure_alignment(pos.copy())
     best_length = float(compute_tour_length(tour, coords_x, coords_y))
     stagnation_count = 0
+    kicked_tour = ensure_alignment(np.empty(n, dtype=np.int32))
+    kicked_pos = ensure_alignment(np.empty(n, dtype=np.int32))
 
     t_start = time.monotonic()
-    deadline = t_start + time_limit_s * 0.97 if time_limit_s > 0 else float("inf")
+    deadline = (
+        t_start + time_limit_s * TIME_SAFETY_MARGIN
+        if time_limit_s > 0
+        else float("inf")
+    )
 
     kicks_done = 0
     while kicks_done < num_kicks:
@@ -1158,6 +1143,11 @@ def cascading_kopt_optimize(
             best_tour,
             best_length,
             stagnation_count,
+            kicked_tour,
+            pos,
+            best_pos,
+            kicked_pos,
+            dlb,
         )
         kicks_done += this_chunk
 
