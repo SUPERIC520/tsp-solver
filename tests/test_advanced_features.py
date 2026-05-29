@@ -39,8 +39,21 @@ def test_alpha_calculation() -> None:
     # Check that edges in the 1-tree have alpha = 0
     # Actually, let's just check the MST of n-1 nodes
     root = 0
-    adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
-    _, _, parent = compute_mst_weight(n, coords, adj_ptr, adj_indices, pi, root)
+    adj_ptr, adj_indices, adj_dists = _build_undirected_adj(n, coords, candidate_set)
+
+    # Pre-allocate buffers for MST call
+    min_dist = np.empty(n, dtype=np.float64)
+    parent = np.empty(n, dtype=np.int32)
+    visited = np.empty(n, dtype=np.bool_)
+    degrees = np.empty(n, dtype=np.int32)
+    max_heap_size = int(adj_ptr[n])
+    heap_val = np.empty(max_heap_size, dtype=np.float64)
+    heap_node = np.empty(max_heap_size, dtype=np.int32)
+
+    _w = compute_mst_weight(
+        n, adj_ptr, adj_indices, adj_dists, pi, root,
+        min_dist, parent, visited, degrees, heap_val, heap_node
+    )
 
     for i in range(n):
         if i == root or parent[i] == -1:

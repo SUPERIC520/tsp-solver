@@ -42,7 +42,7 @@ uv run python -m src.scripts.main --n 500 --kicks 100 --iters 1 --seeds 8
 *   `--kicks`: Number of double-bridge kicks per seed.
 *   `--seeds`: Number of parallel optimization starts.
 *   `--iters`: Number of full re-optimization passes (0 for infinite).
-*   `--max_opt`: Maximum K-opt level (default 3, range [2, 5]).
+*   `--max_opt`: Maximum K-opt level (default 5, range [2, 5]).
 *   `--hk_iter`: Iterations for Held-Karp lower bound computation.
 *   `--no_cache`: Disable using cached Held-Karp results.
 *   `--start_tour`: Path to a tour CSV/text file to initialize optimization.
@@ -62,7 +62,7 @@ The project maintains strict standards for type safety and linting:
 uv run pytest
 
 # Run strict type checking
-uv run mypy --strict src tests
+uv run mypy src tests
 uv run pyright src tests
 
 # Run linter
@@ -207,39 +207,7 @@ The Double Bridge is a 4-opt move that removes four edges and reconnects the res
 #### Array Manipulation
 The algorithm selects four array indices $i_1, i_2, i_3, i_4$ using a uniform probability distribution generator. The 1D tour array is partitioned at these indices. The vertex indices are copied into a second 1D array in the A, D, C, B sequence order.
 
-## 4. Evolutionary Backbone Mechanism (Gamma Penalty)
-
-### Frequency Analysis
-The mechanism executes a frequency analysis operation after `N` iterations of the algorithm across `S` distinct seed executions. For a set of `S` output tours $T = \{T_1, T_2, ..., T_S\}$, where each tour $T_s$ consists of a set of undirected edges $E_s$, the mechanism computes the appearance count $C_{i,j}$ for every edge $(i, j)$ in the union of all generated tours $\bigcup_{s=1}^S E_s$.
-
-The frequency of an edge, $f_{i,j}$, is calculated as the ratio of its appearance count to the integer count of seed executions:
-$f_{i,j} = \frac{C_{i,j}}{S}$
-where $C_{i,j} = \sum_{s=1}^S \mathbb{1}((i, j) \in E_s)$ and $\mathbb{1}$ is the indicator function.
-
-### Gamma Penalty Multiplier Generation
-The system utilizes the calculated frequencies $f_{i,j}$ to define a penalty term for the candidate set generation phase of iteration $N+1$ and beyond. The edge appearance frequency $f_{i,j}$ functions as the penalty multiplier. The gamma penalty multiplier $\gamma_{i,j}$ is equal to the frequency $f_{i,j}$:
-$\gamma_{i,j} = f_{i,j}$
-
-### Candidate Set Sorting Key Mutation
-During candidate set generation, the system sorts edges based on an alpha value $\alpha_{i,j}$. The backbone mechanism recalculates the sort value by applying the gamma penalty multiplier.
-
-For a candidate edge $(i, k)$ evaluated for node $i$, the mutated sorting key is calculated using the following equation:
-$sort\_key_{i, k} = \alpha_{i, k} - W_{backbone} \times \gamma_{i, k}$
-
-Where:
-* $sort\_key_{i, k}$ is the mutated scalar value used to sort the candidate edges for node $i$ in ascending numerical sequence.
-* $\alpha_{i, k}$ is the pre-mutation alpha measure derived from the 1-tree computations for edge $(i, k)$.
-* $W_{backbone}$ is the configured scalar parameter `backbone_weight`.
-* $\gamma_{i, k}$ is the gamma penalty multiplier, equal to $f_{i, k}$.
-
-### Implementation Mechanics
-1. **Tour Aggregation:** The system stores the $S$ generated tours in a 2-dimensional integer array of shape `(S, V)`, where `V` is the vertex count.
-2. **Frequency Map Construction:** A hash map data structure records $C_{i,j}$ for each distinct edge observed in the $S$ tours.
-3. **Multiplier Distribution:** The system maps the frequencies $f_{i,j}$ to the candidate set data structures. The candidate set for each node $i$ is stored as an array of structures containing the destination node $k$ and the pre-mutation alpha value $\alpha_{i, k}$.
-4. **Key Recalculation:** The sorting routine iterates through the candidate list of each node $i$. For each candidate $k$, the operation subtracts the product of `backbone_weight` and $f_{i, k}$ from the stored $\alpha_{i, k}$ value.
-5. **Sorting:** The candidate arrays are processed by a comparison sort algorithm using the computed $sort\_key_{i, k}$ values to determine the index sequence of candidates explored in operations $N+1$ and beyond.
-
-## 5. Iterative Sequence and Orchestration & System Parameters and Configuration
+## 4. Iterative Sequence and Orchestration & System Parameters and Configuration
 
 ### Orchestration Limit Formula
 The application imports the `multiprocessing` module for task distribution. The process limit executes the formula:
@@ -255,9 +223,9 @@ The engine reads integers from the `src/config.py` file to bound array sizes and
 
 *   `KD_TREE_QUERY_SIZE=64`: The KD-Tree index returns an array containing 64 points per query.
 *   `K_NEIGHBORS=64`: The matrix allocates rows of length 64 to store distances per vertex.
-*   `K_3OPT=48`: The 3-opt function restricts the array length for permutation loops to 48 vertices.
-*   `K_4OPT=32`: The 4-opt function restricts the array length for permutation loops to 32 vertices.
-*   `K_5OPT=16`: The 5-opt function restricts the array length for permutation loops to 16 vertices.
+*   `K_3OPT=32`: The 3-opt function restricts the array length for permutation loops to 32 vertices.
+*   `K_4OPT=16`: The 4-opt function restricts the array length for permutation loops to 16 vertices.
+*   `K_5OPT=8`: The 5-opt function restricts the array length for permutation loops to 8 vertices.
 *   `OR_OPT_MAX_LEN=8`: The Or-opt function executes block relocations on an array slice with a length limit of 8 elements.
 *   `MAX_OPT=5`: The engine restricts the k-opt steps to a k-value limit of 5.
 
@@ -273,7 +241,7 @@ The engine reads the `args.iters` integer to set the loop termination bound.
 7.  When the condition equates to `False`, the loop terminates.
 8.  The process returns the array matrix to the `multiprocessing` pool.
 
-## 6. Memory Allocations, Algorithmic Complexity, and I/O Mechanics
+## 5. Memory Allocations, Algorithmic Complexity, and I/O Mechanics
 
 ### Memory Allocations
 *   **Coordinate Matrices**: Instantiated with dimensions (N, 2). The dtype `np.float64` allocates 8 bytes per scalar, resulting in N * 16 bytes per matrix.

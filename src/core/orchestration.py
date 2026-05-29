@@ -6,34 +6,36 @@ tracking through shared memory.
 """
 
 import multiprocessing as mp
+import multiprocessing.pool
 import sys
 import time
 from typing import Any, NoReturn
 
 import numpy as np
+import numpy.typing as npt
 
 from src.config import NUM_PROCESSES_SOLVER
-from src.core.kopt_engine import cascading_kopt_optimize as kopt_optimize_tour
+from src.core.kopt_engine import cascading_kopt_optimize
 from src.utils.time_utils import format_duration
 
 # Global variable to store the shared progress array in worker processes
-_shared_progress_array: Any = None
+_shared_progress_array: npt.NDArray[np.int32] | None = None
 
 
-def _init_worker(progress_array: Any) -> None:  # noqa: ANN401
-    """Initializer for worker processes. Sets the shared progress array."""
+def _init_worker(progress_array: npt.NDArray[np.int32]) -> None:
+    """Initializer for worker processes. Sets the shared progress array.
+
+    Args:
+        progress_array: Shared memory array for tracking kick progress.
+    """
     global _shared_progress_array  # noqa: PLW0603
     _shared_progress_array = progress_array
 
 
-def _kopt_worker(
+def _solver_worker(
     args: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int, float, int],
 ) -> tuple[np.ndarray, float, int] | Exception:
-    """Worker function for multiprocessing.
-
-    Returns (tour, length, kicks_completed)
-    or catches exceptions and returns the exception object.
-    """
+    """General worker function that dispatches to k-opt engine."""
     try:
         (
             seed,
@@ -48,13 +50,13 @@ def _kopt_worker(
 
         global _shared_progress_array  # noqa: PLW0602
 
-        return kopt_optimize_tour(
+        return cascading_kopt_optimize(
             seed,
             coords_x,
             coords_y,
             candidate_set,
             num_kicks,
-            max_opt,
+            max_opt=max_opt,
             time_limit_s=time_limit_s,
             progress_array=_shared_progress_array,
             seed_idx=seed_idx,
@@ -74,17 +76,16 @@ def parallel_solve(
     candidate_set: np.ndarray,
     num_processes: int = -1,
     num_kicks: int = 100,
-    max_opt: int = 3,
+    max_opt: int = 5,
     time_limit_s: float = -1.0,
     iteration_start_time: float = 0.0,
     total_start_time: float = 0.0,
+    pool: multiprocessing.pool.Pool | None = None,
+    progress_array: Any = None,
 ) -> list[tuple[np.ndarray, float]]:
-    """Run K-Opt optimization in parallel for multiple seeds.
-
-    Uses multiprocessing.Array for low-overhead progress tracking.
-    """
+    """Run optimization in parallel for multiple seeds using cascading K-opt."""
     p_count = num_processes
-    if p_count == -1:
+    if p_count <= 0:
         p_count = NUM_PROCESSES_SOLVER
     if p_count <= 0:
         p_count = mp.cpu_count()
@@ -94,11 +95,25 @@ def parallel_solve(
 
     num_seeds = seeds.shape[0]
 
-    # [T5.1] Shared memory counter array
-    progress_array = mp.Array("i", num_seeds)
+    created_pool = False
+    if progress_array is None:
+        progress_array = mp.Array("i", num_seeds)
+        if pool is None:
+            pool = mp.Pool(
+                processes=min(p_count, num_seeds),
+                initializer=_init_worker,
+                initargs=(progress_array,),
+            )
+            created_pool = True
+    else:
+        # Reset progress array for the new iteration
+        for i in range(num_seeds):
+            progress_array[i] = 0
 
-    # Disable inter-process tour synchronization to prevent locks.
-    # Distribute slice seeds and the progress Array.
+    if pool is None:
+        msg = "Persistent pool must be initialized before calling parallel_solve"
+        raise RuntimeError(msg)
+    # Distribute slice seeds
     tasks = [
         (
             seeds[i],
@@ -117,23 +132,15 @@ def parallel_solve(
     completed = [False] * num_seeds
     start_time = time.time()
 
-    # [T5.2] Setup worker processes initialization under mp.Pool
-    pool = mp.Pool(
-        processes=min(p_count, num_seeds),
-        initializer=_init_worker,
-        initargs=(progress_array,),
-    )
-
     try:
-        # [T5.3] Implement robust pool manager loop using apply_async
-        async_results = [pool.apply_async(_kopt_worker, (task,)) for task in tasks]
+        async_results = [pool.apply_async(_solver_worker, (task,)) for task in tasks]
 
         while not all(completed):
-            # Check elapsed time for timeout
             if time_limit_s > 0 and (time.time() - start_time) > time_limit_s:
                 sys.stdout.write("\r" + " " * 120 + "\r")
-                pool.terminate()
-                pool.join()
+                if created_pool:
+                    pool.terminate()
+                    pool.join()
                 break
 
             for i, res in enumerate(async_results):
@@ -145,15 +152,13 @@ def parallel_solve(
                     results.append((result[0], result[1]))
                     completed[i] = True
                     sys.stdout.write("\r" + " " * 120 + "\r")
-                    print(  # noqa: T201
+                    print(
                         f"  - Completed seed {len(results)}/{num_seeds} "
                         f"(Length: {result[1]:.2f})"
                     )
 
             if not all(completed):
                 time.sleep(0.1)
-
-                # Real-time progress reporting (T5.1)
                 total_kicks_done = sum(progress_array[:])
                 total_kicks_target = num_seeds * num_kicks
                 percent = (
@@ -161,28 +166,28 @@ def parallel_solve(
                     if total_kicks_target > 0
                     else 0.0
                 )
-
                 done = sum(completed)
                 iter_elapsed = time.time() - iteration_start_time
                 total_elapsed = time.time() - total_start_time
                 status = (
-                    f"\r    [Progress] {done}/{num_seeds} seeds solved | "
+                    f"\r    [Optimization Progress] {done}/{num_seeds} solved | "
                     f"kicks: {total_kicks_done}/{total_kicks_target} "
                     f"({percent:.2f}%) | "
                     f"Iter Elapsed: {format_duration(iter_elapsed)} | "
                     f"Total Elapsed: {format_duration(total_elapsed)} ..."
                 )
-                # Append padding spaces to the status line itself to clear any remnants
                 sys.stdout.write(status.ljust(120))
                 sys.stdout.flush()
 
-        pool.close()
-        pool.join()
+        if created_pool:
+            pool.close()
+            pool.join()
 
-    except Exception:  # noqa: BLE001
-        pool.terminate()
-        pool.join()
-        # Return best intermediate results collected so far
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"Exception in parallel_solve: {e}\n")
+        if created_pool:
+            pool.terminate()
+            pool.join()
         return results
 
     return results

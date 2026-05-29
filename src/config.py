@@ -52,9 +52,9 @@ MAX_OPT: int = 5
 GAIN_EPSILON: float = 1e-9
 
 # Dynamic funneling width limits
-K_3OPT: int = 48
-K_4OPT: int = 32
-K_5OPT: int = 16
+K_3OPT: int = 32
+K_4OPT: int = 16
+K_5OPT: int = 8
 
 # Maximum segment length for Or-opt relocations
 OR_OPT_MAX_LEN: int = 8

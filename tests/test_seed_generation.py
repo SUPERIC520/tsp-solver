@@ -67,6 +67,14 @@ def test_rotate_tour_edge_cases() -> None:
     assert np.array_equal(rotate_tour(tour, 1), [1, 0])
 
 
+def test_rotate_tour_inplace() -> None:
+    tour = np.array([3, 1, 4, 2, 0], dtype=np.int32)
+    out = np.zeros(5, dtype=np.int32)
+    res = rotate_tour(tour, 4, out=out)
+    assert res is out
+    assert np.array_equal(out, [4, 2, 0, 3, 1])
+
+
 def test_generate_greedy_nn_seeds() -> None:
     # Setup coordinates and candidate sets
     coords = np.array(

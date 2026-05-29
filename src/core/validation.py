@@ -5,131 +5,61 @@ This module provides functions to compute the Held-Karp lower bound using
 used for candidate set refinement.
 """
 
-import json
-from pathlib import Path
-
 import numpy as np
 import numpy.typing as npt
 from numba import njit, prange
 
-from src.config import CACHE_DIR, CACHE_VERSION
-from src.utils.data_io import load_hk_cache, save_hk_cache
+from src.utils.data_io import load_hk_cache
 
 # Minimum lambda threshold for Held-Karp subgradient optimization
 HK_MIN_LAMBDA: float = 0.0001
 
-# Project root is two levels up from src/core/validation.py
-_root = Path(__file__).resolve().parent.parent.parent
-CACHE_PATH = CACHE_DIR / CACHE_VERSION / "hk_bounds.json"
 
-
-def load_hk_cache_json(
-    n: int, max_iter: int
-) -> tuple[float, npt.NDArray[np.float64]] | None:
-    """Load Held-Karp bound and pi values from JSON cache if iterations match.
+def compute_hk_lower_bound(
+    coords: npt.NDArray[np.float64],
+    candidate_set: npt.NDArray[np.int32],
+    max_iter: int = 500,
+    initial_pi: npt.NDArray[np.float64] | None = None,
+    target_ub: float = np.inf,
+    sample_name: str | None = None,
+    *,
+    use_cache: bool = True,
+) -> tuple[float, npt.NDArray[np.float64]]:
+    """Compute the Held-Karp lower bound.
 
     Args:
-        n: Number of cities.
-        max_iter: Minimum required iteration count.
+        coords: Coordinates of the cities.
+        candidate_set: Candidate set for neighbor pruning.
+        max_iter: Maximum number of subgradient iterations.
+        initial_pi: Initial pi values for subgradient optimization.
+        target_ub: Target upper bound for step size calculation.
+        sample_name: Name of the sample for caching.
+        use_cache: Whether to load the cached bound if available.
 
     Returns:
-        A tuple (lower_bound, pi_array) if found and has enough iterations, else None.
+        A tuple (lower_bound, pi_array).
     """
-    if not CACHE_PATH.exists():
-        return None
-    try:
-        with CACHE_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        key = str(n)
-        if key in data:
-            entry = data[key]
-            # Match params to hk iters specifically
-            # (must have at least requested iterations)
-            cached_iter = entry.get("hk_iter", 0)
-            if cached_iter >= max_iter:
-                lb_val = entry.get("lb", entry.get("lower_bound"))
-                if lb_val is not None:
-                    lb = float(lb_val)
-                    pi = np.array(entry["pi"], dtype=np.float64)
-                    return lb, pi
-    except (OSError, ValueError, KeyError):
-        pass
-    return None
+    n = coords.shape[0]
+    name = sample_name or str(n)
+
+    if use_cache:
+        cached = load_hk_cache(name)
+        if cached:
+            return cached
+
+    if initial_pi is None:
+        init_pi = np.zeros(n, dtype=np.float64)
+    else:
+        init_pi = np.ascontiguousarray(initial_pi, dtype=np.float64)
+
+    best_lb, best_pi = _compute_hk_impl(
+        coords, candidate_set, max_iter, init_pi, target_ub
+    )
+
+    return best_lb, best_pi
 
 
-def load_hk_cache_pi_only(n: int) -> npt.NDArray[np.float64] | None:
-    """Load cached pi values from JSON cache for warm starting.
-
-    Args:
-        n: Number of cities.
-
-    Returns:
-        Pi values array if found, else None.
-    """
-    if not CACHE_PATH.exists():
-        return None
-    try:
-        with CACHE_PATH.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        key = str(n)
-        if key in data:
-            entry = data[key]
-            if "pi" in entry:
-                return np.array(entry["pi"], dtype=np.float64)
-    except (OSError, ValueError, KeyError):
-        pass
-    return None
-
-
-def save_hk_cache_json(
-    n: int, lb: float, pi: npt.NDArray[np.float64], hk_iter: int
-) -> None:
-    """Save Held-Karp lower bound and pi values to JSON cache.
-
-    Args:
-        n: Number of cities.
-        lb: Lower bound value.
-        pi: Pi values array.
-        hk_iter: Iterations used to compute this bound.
-    """
-    data = {}
-    if CACHE_PATH.exists():
-        try:
-            with CACHE_PATH.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            pass
-
-    key = str(n)
-    should_write = True
-    if key in data:
-        entry = data[key]
-        existing_iter = entry.get("hk_iter", 0)
-        existing_lb = entry.get("lb", entry.get("lower_bound", -np.inf))
-        if hk_iter < existing_iter and lb <= existing_lb:
-            should_write = False
-
-    if should_write:
-        data[key] = {"lb": lb, "pi": pi.tolist(), "hk_iter": hk_iter}
-        try:
-            CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with CACHE_PATH.open("w", encoding="utf-8") as f:
-                json.dump(data, f)
-        except OSError:
-            pass
-
-
-@njit(cache=True, fastmath=True)  # type: ignore
-def _get_dist(
-    i: int, j: int, coords: npt.NDArray[np.float64], pi: npt.NDArray[np.float64]
-) -> float:
-    """Get transformed distance: d'(i,j) = d(i,j) + pi[i] + pi[j]."""
-    dx = coords[i, 0] - coords[j, 0]
-    dy = coords[i, 1] - coords[j, 1]
-    return float(np.sqrt(dx * dx + dy * dy) + pi[i] + pi[j])
-
-
-@njit(cache=True, fastmath=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def _heap_push(
     heap_val: npt.NDArray[np.float64],
     heap_node: npt.NDArray[np.int32],
@@ -152,7 +82,7 @@ def _heap_push(
     return size
 
 
-@njit(cache=True, fastmath=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def _heap_pop(
     heap_val: npt.NDArray[np.float64], heap_node: npt.NDArray[np.int32], size: int
 ) -> tuple[float, int, int]:
@@ -183,10 +113,11 @@ def _heap_pop(
     return res_d, int(res_node), size
 
 
-@njit(cache=True, fastmath=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def _build_undirected_adj(
-    n: int, candidate_set: npt.NDArray[np.int32]
-) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    n: int, coords: npt.NDArray[np.float64], candidate_set: npt.NDArray[np.int32]
+) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32], npt.NDArray[np.float64]]:
+    """Build undirected adjacency list and pre-calculate distances."""
     adj_ptr = np.zeros(n + 1, dtype=np.int32)
     for u in range(n):
         for k in range(candidate_set.shape[1]):
@@ -200,6 +131,7 @@ def _build_undirected_adj(
         adj_ptr[i + 1] += adj_ptr[i]
 
     adj_indices = np.empty(int(adj_ptr[n]), dtype=np.int32)
+    adj_dists = np.empty(int(adj_ptr[n]), dtype=np.float64)
     curr_ptr = adj_ptr.copy()
 
     for u in range(n):
@@ -207,51 +139,55 @@ def _build_undirected_adj(
             v = int(candidate_set[u, k])
             if v == -1:
                 break
-            adj_indices[curr_ptr[u]] = v
+
+            # Calculate original Euclidean distance
+            dx = coords[u, 0] - coords[v, 0]
+            dy = coords[u, 1] - coords[v, 1]
+            d = float(np.sqrt(dx * dx + dy * dy))
+
+            idx_u = curr_ptr[u]
+            adj_indices[idx_u] = v
+            adj_dists[idx_u] = d
             curr_ptr[u] += 1
-            adj_indices[curr_ptr[v]] = u
+
+            idx_v = curr_ptr[v]
+            adj_indices[idx_v] = u
+            adj_dists[idx_v] = d
             curr_ptr[v] += 1
 
-    return adj_ptr, adj_indices
+    return adj_ptr, adj_indices, adj_dists
 
 
-@njit(cache=True, fastmath=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def compute_mst_weight(
     n: int,
-    coords: npt.NDArray[np.float64],
     adj_ptr: npt.NDArray[np.int32],
     adj_indices: npt.NDArray[np.int32],
+    adj_dists: npt.NDArray[np.float64],
     pi: npt.NDArray[np.float64],
     root: int,
-) -> tuple[float, npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    # Pre-allocated buffers
+    min_dist: npt.NDArray[np.float64],
+    parent: npt.NDArray[np.int32],
+    visited: npt.NDArray[np.bool_],
+    degrees: npt.NDArray[np.int32],
+    heap_val: npt.NDArray[np.float64],
+    heap_node: npt.NDArray[np.int32],
+) -> float:
     """Compute the Minimum Spanning Tree (MST) weight of a 1-tree relaxation.
 
-    Args:
-        n: Number of cities.
-        coords: Coordinates of the cities.
-        adj_ptr: Adjacency list pointer.
-        adj_indices: Adjacency list indices.
-        pi: Pi values for distance transformation.
-        root: The root node for the 1-tree.
-
-    Returns:
-        A tuple (total_weight, degrees, parent_array).
+    Uses pre-allocated buffers and pre-calculated distances for performance.
     """
-    min_dist = np.full(n, np.inf, dtype=np.float64)
-    parent = np.full(n, -1, dtype=np.int32)
-    visited = np.zeros(n, dtype=np.bool_)
+    min_dist.fill(np.inf)
+    parent.fill(-1)
+    visited.fill(False)
+    degrees.fill(0)
 
     start_node = 1 if root == 0 else 0
     min_dist[start_node] = 0.0
 
     total_weight = 0.0
-    degrees = np.zeros(n, dtype=np.int32)
-
-    max_heap_size = int(adj_ptr[n])
-    heap_val = np.empty(max_heap_size, dtype=np.float64)
-    heap_node = np.empty(max_heap_size, dtype=np.int32)
     heap_size = 0
-
     heap_size = _heap_push(heap_val, heap_node, heap_size, 0.0, start_node)
 
     nodes_added = 0
@@ -262,24 +198,31 @@ def compute_mst_weight(
         visited[u] = True
         total_weight += d
         nodes_added += 1
-        if parent[u] != -1:
+
+        p = parent[u]
+        if p != -1:
             degrees[u] += 1
-            degrees[int(parent[u])] += 1
+            degrees[p] += 1
+
         for k in range(int(adj_ptr[u]), int(adj_ptr[u + 1])):
             v = int(adj_indices[k])
             if v == root or visited[v]:
                 continue
-            dist_uv = _get_dist(u, v, coords, pi)
+
+            # Transformed distance: d'(u,v) = d(u,v) + pi[u] + pi[v]
+            dist_uv = adj_dists[k] + pi[u] + pi[v]
+
             if dist_uv < min_dist[v]:
                 min_dist[v] = dist_uv
                 parent[v] = u
                 heap_size = _heap_push(heap_val, heap_node, heap_size, dist_uv, v)
+
     if nodes_added < n - 1:
-        return -1.0, degrees, parent
-    return total_weight, degrees, parent
+        return -1.0
+    return total_weight
 
 
-@njit(cache=True, fastmath=True, parallel=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def _compute_hk_impl(
     coords: npt.NDArray[np.float64],
     candidate_set: npt.NDArray[np.int32],
@@ -291,33 +234,52 @@ def _compute_hk_impl(
     coords = np.ascontiguousarray(coords)
     candidate_set = np.ascontiguousarray(candidate_set)
     pi = np.ascontiguousarray(initial_pi).copy()
+
     best_lb = -np.inf
     best_pi = pi.copy()
-    adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
+
+    adj_ptr, adj_indices, adj_dists = _build_undirected_adj(n, coords, candidate_set)
+
+    # Pre-allocate MST buffers
+    min_dist = np.empty(n, dtype=np.float64)
+    parent = np.empty(n, dtype=np.int32)
+    visited = np.empty(n, dtype=np.bool_)
+    degrees = np.empty(n, dtype=np.int32)
+    max_heap_size = int(adj_ptr[n])
+    heap_val = np.empty(max_heap_size, dtype=np.float64)
+    heap_node = np.empty(max_heap_size, dtype=np.int32)
+
     lambda_val = 2.0
     period = max(100, max_iter // 50)
     last_improvement = 0
     upper_bound = target_ub
+
     for iteration in range(max_iter):
         root = 0
         mst_weight = -1.0
-        degrees = np.zeros(n, dtype=np.int32)
+
+        # Try a few roots if connectivity issues occur
         for r_try in range(3):
             root = (r_try * (n // 3)) % n
-            mst_weight, degrees, _ = compute_mst_weight(
-                n, coords, adj_ptr, adj_indices, pi, root
+            mst_weight = compute_mst_weight(
+                n, adj_ptr, adj_indices, adj_dists, pi, root,
+                min_dist, parent, visited, degrees, heap_val, heap_node
             )
             if mst_weight != -1.0:
                 break
+
         if mst_weight == -1.0:
             if best_lb == -np.inf:
                 return 0.0, pi
             return best_lb, best_pi
+
+        # Find two shortest edges incident to root in the candidate set
         d1, d2 = np.inf, np.inf
         n1, n2 = -1, -1
         for k in range(int(adj_ptr[root]), int(adj_ptr[root + 1])):
             v = int(adj_indices[k])
-            d = _get_dist(root, v, coords, pi)
+            # d'(root, v) = d(root, v) + pi[root] + pi[v]
+            d = adj_dists[k] + pi[root] + pi[v]
             if d < d1:
                 d2 = d1
                 n2 = n1
@@ -326,30 +288,38 @@ def _compute_hk_impl(
             elif d < d2:
                 d2 = d
                 n2 = v
+
         if n2 == -1:
             if best_lb == -np.inf:
                 return 0.0, pi
             return best_lb, best_pi
+
         one_tree_weight = mst_weight + d1 + d2
         degrees[root] = 2
         degrees[n1] += 1
         degrees[n2] += 1
+
         lb = one_tree_weight - 2.0 * np.sum(pi)
+
         if lb > best_lb + 1e-6:
             best_lb = lb
             best_pi = pi.copy()
             last_improvement = iteration
+
         if upper_bound == np.inf:
-            upper_bound = lb * 1.2
+            upper_bound = lb * 1.1 # Closer guess for UB
+
         subgradient = degrees - 2
         norm_sq = np.sum(subgradient * subgradient)
         if norm_sq == 0:
             break
+
         if iteration - last_improvement >= period:
-            lambda_val *= 0.7
+            lambda_val *= 0.8 # More conservative decay
             last_improvement = iteration
             if lambda_val < HK_MIN_LAMBDA:
                 break
+
         target = (
             min(upper_bound, best_lb * 1.05)
             if upper_bound > best_lb
@@ -357,66 +327,11 @@ def _compute_hk_impl(
         )
         step = lambda_val * (target - lb) / norm_sq
         pi += step * subgradient
-    return best_lb, best_pi
-
-
-def compute_hk_lower_bound(
-    coords: npt.NDArray[np.float64],
-    candidate_set: npt.NDArray[np.int32],
-    max_iter: int = 500,
-    initial_pi: npt.NDArray[np.float64] | None = None,
-    target_ub: float = np.inf,
-    sample_name: str | None = None,
-    *,
-    use_cache: bool = True,
-) -> tuple[float, npt.NDArray[np.float64]]:
-    """Compute the Held-Karp lower bound.
-
-    Args:
-        coords: Coordinates of the cities.
-        candidate_set: Candidate set for neighbor pruning.
-        max_iter: Maximum number of subgradient iterations.
-        initial_pi: Initial pi values for subgradient optimization.
-        target_ub: Target upper bound for step size calculation.
-        sample_name: Name of the sample for caching.
-        use_cache: Whether to load the cached bound if available.
-
-    Returns:
-        A tuple (lower_bound, pi_array).
-    """
-    n = coords.shape[0]
-    if use_cache:
-        cached_json = load_hk_cache_json(n, max_iter)
-        if cached_json is not None:
-            return cached_json
-
-        if sample_name:
-            cached = load_hk_cache(sample_name)
-            if cached:
-                save_hk_cache_json(n, cached[0], cached[1], max_iter)
-                return cached
-
-    if initial_pi is None:
-        init_pi = None
-        if use_cache:
-            init_pi = load_hk_cache_pi_only(n)
-        if init_pi is None:
-            init_pi = np.zeros(n, dtype=np.float64)
-    else:
-        init_pi = np.ascontiguousarray(initial_pi, dtype=np.float64)
-
-    best_lb, best_pi = _compute_hk_impl(
-        coords, candidate_set, max_iter, init_pi, target_ub
-    )
-
-    save_hk_cache_json(n, best_lb, best_pi, max_iter)
-    if sample_name:
-        save_hk_cache(sample_name, best_lb, best_pi)
 
     return best_lb, best_pi
 
 
-@njit(cache=True, fastmath=True, parallel=True)  # type: ignore
+@njit(fastmath=True, parallel=True)  # type: ignore
 def compute_alpha_values(
     n: int,
     coords: npt.NDArray[np.float64],
@@ -426,29 +341,34 @@ def compute_alpha_values(
     """Compute Alpha-values for candidate set refinement.
 
     Alpha-values measure the 'nearness' of an edge to the MST.
-
-    Args:
-        n: Number of cities.
-        coords: Coordinates of the cities.
-        candidate_set: Candidate set for neighbor pruning.
-        pi: Pi values from Held-Karp relaxation.
-
-    Returns:
-        A matrix of Alpha-values of shape (n, num_candidates).
     """
     coords = np.ascontiguousarray(coords)
     candidate_set = np.ascontiguousarray(candidate_set)
     pi = np.ascontiguousarray(pi)
-    adj_ptr, adj_indices = _build_undirected_adj(n, candidate_set)
+
+    adj_ptr, adj_indices, adj_dists = _build_undirected_adj(n, coords, candidate_set)
+
+    # Pre-allocate MST buffers for alpha calculation
+    min_dist = np.empty(n, dtype=np.float64)
+    parent = np.empty(n, dtype=np.int32)
+    visited = np.empty(n, dtype=np.bool_)
+    degrees = np.empty(n, dtype=np.int32)
+    max_heap_size = int(adj_ptr[n])
+    heap_val = np.empty(max_heap_size, dtype=np.float64)
+    heap_node = np.empty(max_heap_size, dtype=np.int32)
+
     root = 0
-    _mst_weight, _degrees, parent = compute_mst_weight(
-        n, coords, adj_ptr, adj_indices, pi, root
+    _mst_weight = compute_mst_weight(
+        n, adj_ptr, adj_indices, adj_dists, pi, root,
+        min_dist, parent, visited, degrees, heap_val, heap_node
     )
+
+    # Find two shortest edges incident to root
     d1, d2 = np.inf, np.inf
     n1, n2 = -1, -1
     for k in range(int(adj_ptr[root]), int(adj_ptr[root + 1])):
         v = int(adj_indices[k])
-        d = _get_dist(root, v, coords, pi)
+        d = adj_dists[k] + pi[root] + pi[v]
         if d < d1:
             d2 = d1
             n2 = n1
@@ -457,6 +377,8 @@ def compute_alpha_values(
         elif d < d2:
             d2 = d
             n2 = v
+
+    # Build MST adjacency for LCA preprocessing
     mst_adj_ptr = np.zeros(n + 1, dtype=np.int32)
     for i in range(n):
         if i == root or parent[i] == -1:
@@ -465,14 +387,22 @@ def compute_alpha_values(
         mst_adj_ptr[int(parent[i]) + 1] += 1
     for i in range(n):
         mst_adj_ptr[i + 1] += mst_adj_ptr[i]
+
     mst_adj_indices = np.empty(int(mst_adj_ptr[n]), dtype=np.int32)
     mst_adj_weights = np.empty(int(mst_adj_ptr[n]), dtype=np.float64)
     curr_ptr = mst_adj_ptr.copy()
+
     for i in range(n):
         if i == root or parent[i] == -1:
             continue
         p = int(parent[i])
-        w = _get_dist(i, p, coords, pi)
+        # Find weight in original adj list to avoid re-calculating
+        w = 0.0
+        for k in range(int(adj_ptr[i]), int(adj_ptr[i + 1])):
+            if adj_indices[k] == p:
+                w = adj_dists[k] + pi[i] + pi[p]
+                break
+
         mst_adj_indices[curr_ptr[i]] = p
         mst_adj_weights[curr_ptr[i]] = w
         curr_ptr[i] += 1
@@ -526,9 +456,13 @@ def compute_alpha_values(
                 if val_other in (n1, n2):
                     alphas[int(u_idx), cand_k] = 0.0
                 else:
-                    alphas[int(u_idx), cand_k] = (
-                        _get_dist(root, val_other, coords, pi) - d2
-                    )
+                    # Find d'(root, other)
+                    d_ro = 0.0
+                    for k in range(int(adj_ptr[root]), int(adj_ptr[root + 1])):
+                        if adj_indices[k] == val_other:
+                            d_ro = adj_dists[k] + pi[root] + pi[val_other]
+                            break
+                    alphas[int(u_idx), cand_k] = d_ro - d2
             else:
                 curr_u = int(u_idx)
                 curr_v = int(v_idx)
@@ -552,9 +486,13 @@ def compute_alpha_values(
                     max_e = max(max_e, max_edge[curr_u, 0])
                     max_e = max(max_e, max_edge[curr_v, 0])
 
-                alphas[int(u_idx), cand_k] = (
-                    _get_dist(int(u_idx), int(v_idx), coords, pi) - max_e
-                )
+                # Find d'(u, v)
+                d_uv = 0.0
+                for k in range(int(adj_ptr[u_idx]), int(adj_ptr[u_idx + 1])):
+                    if adj_indices[k] == v_idx:
+                        d_uv = adj_dists[k] + pi[u_idx] + pi[v_idx]
+                        break
+                alphas[int(u_idx), cand_k] = d_uv - max_e
     return alphas
 
 

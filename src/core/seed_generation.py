@@ -5,6 +5,7 @@ greedy nearest-neighbor heuristics, with support for parallel execution.
 """
 
 import multiprocessing as mp
+import multiprocessing.pool
 from typing import cast
 
 import numpy as np
@@ -14,20 +15,17 @@ from src.config import NUM_PROCESSES_SEEDING
 from src.utils.memory_utils import ensure_alignment
 
 
-@njit(fastmath=True, cache=True)  # type: ignore
-def _greedy_nn_tour(
+@njit(fastmath=True)  # type: ignore
+def _greedy_nn_tour_impl(
     coords: np.ndarray,
     candidate_set: np.ndarray,
     start: int,
-) -> np.ndarray:
-    """Build a greedy nearest-neighbor tour starting from `start`.
-
-    Uses the candidate set for O(N*k) construction instead of O(N^2).
-    Falls back to a linear scan for any node not reachable via candidates.
-    """
+    tour: np.ndarray,
+    visited: np.ndarray,
+) -> None:
+    """Internal implementation of greedy NN tour generation using provided buffers."""
     n = coords.shape[0]
-    tour = np.empty(n, dtype=np.int32)
-    visited = np.zeros(n, dtype=np.bool_)
+    visited.fill(False)
 
     tour[0] = start
     visited[start] = True
@@ -64,6 +62,18 @@ def _greedy_nn_tour(
         tour[step] = best_next
         visited[best_next] = True
 
+
+@njit(fastmath=True)  # type: ignore
+def _greedy_nn_tour(
+    coords: np.ndarray,
+    candidate_set: np.ndarray,
+    start: int,
+) -> np.ndarray:
+    """Build a greedy nearest-neighbor tour starting from `start`."""
+    n = coords.shape[0]
+    tour = np.empty(n, dtype=np.int32)
+    visited = np.zeros(n, dtype=np.bool_)
+    _greedy_nn_tour_impl(coords, candidate_set, start, tour, visited)
     return tour
 
 
@@ -73,7 +83,7 @@ def _greedy_nn_worker(args: tuple[np.ndarray, np.ndarray, int]) -> np.ndarray:
     return cast("np.ndarray", _greedy_nn_tour(coords, candidate_set, int(start_node)))
 
 
-@njit(cache=True)  # type: ignore
+@njit()
 def _find_index_jit(arr: np.ndarray, val: int) -> int:
     for i in range(arr.shape[0]):
         if arr[i] == val:
@@ -81,7 +91,15 @@ def _find_index_jit(arr: np.ndarray, val: int) -> int:
     return -1
 
 
-@njit(cache=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
+def _rotate_tour_inplace_jit(tour: np.ndarray, start_idx: int, out: np.ndarray) -> None:
+    n = tour.shape[0]
+    out[: n - start_idx] = tour[start_idx:]
+    out[n - start_idx :] = tour[:start_idx]
+
+
+@njit
+  # type: ignore
 def _rotate_tour_jit(tour: np.ndarray, start_idx: int) -> np.ndarray:
     n = tour.shape[0]
     out = np.empty(n, dtype=np.int32)
@@ -90,7 +108,9 @@ def _rotate_tour_jit(tour: np.ndarray, start_idx: int) -> np.ndarray:
     return out
 
 
-def rotate_tour(tour: np.ndarray, start_node: int) -> np.ndarray:
+def rotate_tour(
+    tour: np.ndarray, start_node: int, out: np.ndarray | None = None
+) -> np.ndarray:
     """Rotate starting node sequence.
 
     Keeps the path cycle topology unchanged.
@@ -102,6 +122,10 @@ def rotate_tour(tour: np.ndarray, start_node: int) -> np.ndarray:
         msg = f"start_node {start_node} not found in tour"
         raise ValueError(msg)
 
+    if out is not None:
+        _rotate_tour_inplace_jit(tour, start_idx, out)
+        return out
+
     rotated = _rotate_tour_jit(tour, start_idx)
     return ensure_alignment(rotated, alignment=64)
 
@@ -111,6 +135,7 @@ def generate_greedy_nn_seeds(
     candidate_set: np.ndarray,
     num_seeds: int = 1,
     start_nodes: np.ndarray | None = None,
+    pool: multiprocessing.pool.Pool | None = None,
 ) -> np.ndarray:
     """Generate greedy nearest-neighbor seeds in parallel.
 
@@ -151,11 +176,19 @@ def generate_greedy_nn_seeds(
 
     # Run in parallel pool
     if num_procs > 1:
-        with mp.Pool(processes=num_procs) as pool:
+        if pool is not None:
             tours = pool.map(_greedy_nn_worker, tasks)
+        else:
+            with mp.Pool(processes=num_procs) as temp_pool:
+                tours = temp_pool.map(_greedy_nn_worker, tasks)
     else:
         # Fallback to serial execution if only 1 process is used
-        tours = [_greedy_nn_worker(task) for task in tasks]
+        tours = []
+        visited = np.zeros(n, dtype=np.bool_)
+        for i in range(num_seeds):
+            tour = np.empty(n, dtype=np.int32)
+            _greedy_nn_tour_impl(coords, candidate_set, int(start_nodes[i]), tour, visited)
+            tours.append(tour)
 
     # Convert list of tours to a 2D numpy array
     seeds = np.empty((num_seeds, n), dtype=np.int32)
@@ -163,4 +196,12 @@ def generate_greedy_nn_seeds(
         seeds[i] = tours[i]
 
     # Ensure the returned matrix is 64-byte aligned and contiguous
+    return ensure_alignment(seeds, alignment=64)
+
+
+def generate_random_seeds(n: int, num_seeds: int) -> np.ndarray:
+    """Generate random initial tours."""
+    seeds = np.empty((num_seeds, n), dtype=np.int32)
+    for i in range(num_seeds):
+        seeds[i] = np.random.permutation(n).astype(np.int32)
     return ensure_alignment(seeds, alignment=64)

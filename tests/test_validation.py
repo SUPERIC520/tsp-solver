@@ -91,42 +91,30 @@ def test_hk_bound_precision_and_cache() -> None:
     assert lb > 0.0
     assert pi.shape == (6,)
 
-    from src.core.validation import load_hk_cache_json, save_hk_cache_json
+    from src.utils.data_io import load_hk_cache, save_hk_cache
 
     dummy_n = 9999
     dummy_lb = 42.42
     dummy_pi = np.ones(dummy_n, dtype=np.float64) * 0.123
 
-    # Save with 100 iterations
-    save_hk_cache_json(dummy_n, dummy_lb, dummy_pi, hk_iter=100)
+    # Save dummy cache
+    save_hk_cache(str(dummy_n), dummy_lb, dummy_pi)
 
-    # Requesting 100 iterations should hit the cache
-    loaded = load_hk_cache_json(dummy_n, max_iter=100)
+    # Requesting should hit the cache
+    loaded = load_hk_cache(str(dummy_n))
     assert loaded is not None
     assert np.isclose(loaded[0], dummy_lb)
     assert np.allclose(loaded[1], dummy_pi)
 
-    # Requesting 200 iterations should NOT hit the cache
-    loaded_more = load_hk_cache_json(dummy_n, max_iter=200)
-    assert loaded_more is None
-
     dummy_coords = np.zeros((dummy_n, 2), dtype=np.float64)
     dummy_candidates = np.zeros((dummy_n, 3), dtype=np.int32)
 
-    # compute_hk_lower_bound with max_iter=100 should hit the cache
+    # compute_hk_lower_bound should hit the cache
     lb_cached, pi_cached = compute_hk_lower_bound(
         dummy_coords, dummy_candidates, max_iter=100
     )
     assert np.isclose(lb_cached, dummy_lb)
     assert np.allclose(pi_cached, dummy_pi)
-
-    # compute_hk_lower_bound with max_iter=200 should NOT hit the cache
-    # (it will recompute, returning 0.0)
-    lb_higher_iter, _ = compute_hk_lower_bound(
-        dummy_coords, dummy_candidates, max_iter=200
-    )
-    assert np.isclose(lb_higher_iter, 0.0)
-    assert not np.isclose(lb_higher_iter, dummy_lb)
 
     # Testing use_cache=False: it should not load the dummy cache but
     # instead run the calculation (returning 0.0 for zero coordinates)
@@ -137,20 +125,13 @@ def test_hk_bound_precision_and_cache() -> None:
     assert not np.isclose(lb_uncached, dummy_lb)
 
     # Clean up dummy entry
-    import json
+    import os
+    from pathlib import Path
 
-    from src.core.validation import CACHE_PATH
-
-    if CACHE_PATH.exists():
-        try:
-            with CACHE_PATH.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-            if str(dummy_n) in data:
-                del data[str(dummy_n)]
-                with CACHE_PATH.open("w", encoding="utf-8") as f:
-                    json.dump(data, f)
-        except (OSError, ValueError):
-            pass
+    from src.utils.data_io import get_hk_cache_paths
+    bp, pp = get_hk_cache_paths(str(dummy_n))
+    if Path(bp).exists(): os.remove(bp)
+    if Path(pp).exists(): os.remove(pp)
 
 
 def test_compute_alpha_values_dimensions_and_shape() -> None:

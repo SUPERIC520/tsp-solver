@@ -2,7 +2,7 @@
 
 This module provides functions for reordering cities using Hilbert curves,
 building candidate sets using KD-Trees, and refining candidate sets using
-Alpha-values.
+Alpha-values and soft-backbone bias.
 """
 
 import numpy as np
@@ -15,7 +15,7 @@ from src.core.validation import compute_alpha_values
 from src.utils.memory_utils import ensure_alignment
 
 
-@njit(cache=True)  # type: ignore
+@njit()
 def _xy2d(n: int, x: int, y: int) -> int:
     """Convert (x, y) to d (distance along Hilbert curve).
 
@@ -38,7 +38,7 @@ def _xy2d(n: int, x: int, y: int) -> int:
     return d
 
 
-@njit(cache=True)  # type: ignore
+@njit()
 def get_hilbert_indices(
     coords: npt.NDArray[np.float64],
 ) -> npt.NDArray[np.int32]:
@@ -106,37 +106,64 @@ def hilbert_reorder_cities(
     return reordered_coords_aligned, original_to_new_aligned
 
 
-@njit(parallel=True, fastmath=True, cache=True)  # type: ignore
-def _sort_by_alpha(
+@njit(parallel=True, fastmath=True)  # type: ignore
+def _sort_by_key(
     candidate_set: npt.NDArray[np.int32],
-    alpha_values: npt.NDArray[np.float64],
+    sort_keys: npt.NDArray[np.float64],
 ) -> npt.NDArray[np.int32]:
+    """Re-sort each node's candidate list by the given per-entry sort_keys.
+
+    Lower key = higher priority (listed first).
+    """
     n, k = candidate_set.shape
     refined = np.empty_like(candidate_set)
 
     for i in prange(n):
-        # Only sort the non -1 neighbors
-        num_neighbors = 0
-        for m in range(k):
-            if candidate_set[i, m] == -1:
+        # Create local copies for sorting to avoid modifying original or racing
+        # prange can optimize these stack allocations
+        cands = candidate_set[i].copy()
+        keys = sort_keys[i].copy()
+
+        # Simple insertion sort for small K
+        for m in range(1, k):
+            if cands[m] == -1:
                 break
-            num_neighbors += 1
+            curr_c = cands[m]
+            curr_k = keys[m]
+            j = m - 1
+            while j >= 0 and keys[j] > curr_k:
+                keys[j + 1] = keys[j]
+                cands[j + 1] = cands[j]
+                j -= 1
+            keys[j + 1] = curr_k
+            cands[j + 1] = curr_c
 
-        if num_neighbors > 0:
-            curr_cands = candidate_set[i, :num_neighbors].copy()
-            curr_alphas = alpha_values[i, :num_neighbors].copy()
-
-            # Sort
-            sort_idx = np.argsort(curr_alphas)
-
-            for m in range(num_neighbors):
-                refined[i, m] = curr_cands[sort_idx[m]]
-            for m in range(num_neighbors, k):
-                refined[i, m] = -1
-        else:
-            refined[i, :] = -1
+        refined[i] = cands
 
     return refined
+
+
+@njit(parallel=True, fastmath=True)  # type: ignore
+def _sort_by_alpha(
+    candidate_set: npt.NDArray[np.int32],
+    alpha_values: npt.NDArray[np.float64],
+) -> npt.NDArray[np.int32]:
+    """Sort candidate set by alpha values with minimal allocations."""
+    return _sort_by_key(candidate_set, alpha_values)
+
+
+def apply_backbone_bias(
+    candidate_set: npt.NDArray[np.int32],
+    alpha_values: npt.NDArray[np.float64],
+    freq_matrix: npt.NDArray[np.float64],
+    backbone_weight: float = 0.5,
+) -> npt.NDArray[np.int32]:
+    """Re-sort an already-computed candidate set using backbone frequency bias.
+
+    Sort key: alpha[i, k] - backbone_weight * freq[i, k]
+    """
+    sort_keys = alpha_values - backbone_weight * freq_matrix
+    return _sort_by_key(candidate_set, sort_keys)
 
 
 def refine_candidate_set_with_alpha(
@@ -144,8 +171,10 @@ def refine_candidate_set_with_alpha(
     candidate_set: npt.NDArray[np.int32],
     pi: npt.NDArray[np.float64],
     top_k: int = K_NEIGHBORS,
+    freq_matrix: npt.NDArray[np.float64] | None = None,
+    backbone_weight: float = 0.0,
 ) -> npt.NDArray[np.int32]:
-    """Re-sort candidate set based on Alpha-values.
+    """Re-sort candidate set based on Alpha-values, optionally biased by frequency.
 
     Small Alpha prioritised. Slices the result to the first ``top_k`` elements.
     Returns a 64-byte aligned C-contiguous array of shape (N, top_k), dtype int32.
@@ -173,9 +202,14 @@ def refine_candidate_set_with_alpha(
         candidate_set_aligned.astype(np.int32),
         pi_aligned.astype(np.float64),
     )
-    refined = _sort_by_alpha(
-        candidate_set_aligned.astype(np.int32), alpha_values.astype(np.float64)
-    )
+
+    if freq_matrix is not None and backbone_weight > 0.0:
+        sort_keys = alpha_values - backbone_weight * freq_matrix
+        refined = _sort_by_key(candidate_set_aligned.astype(np.int32), sort_keys)
+    else:
+        refined = _sort_by_alpha(
+            candidate_set_aligned.astype(np.int32), alpha_values.astype(np.float64)
+        )
 
     c_cols = refined.shape[1]
     if c_cols == top_k:

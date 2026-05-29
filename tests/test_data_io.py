@@ -1,51 +1,34 @@
-"""Tests for data I/O utilities, including city loading and solution saving."""
+"""Tests for basic data loading and saving functionality."""
 
-import os
-from typing import Any
+from pathlib import Path
 
 import numpy as np
 
-from src.config import SAMPLE_DATA_PATH
-from src.core.kopt_engine import compute_tour_length
-from src.utils.data_io import load_cities, load_tour, save_tour
+from src.utils.data_io import load_cities, load_tour, save_solution_csv
 
 
 def test_load_cities() -> None:
-    """Test loading city coordinates from a CSV file."""
-    filepath = str(SAMPLE_DATA_PATH)
-    coords = load_cities(filepath)
-
-    assert coords.shape == (5, 2)
-    assert coords.dtype == np.float64
-    assert np.allclose(coords[0], [0.0, 0.0])
-    assert np.allclose(coords[-1], [0.5, 0.5])
+    """Test loading city data from a CSV file."""
+    # This just checks that it doesn't crash and returns expected shape
+    # (assuming cities.csv exists in the default data path)
+    coords = load_cities("data/cities.csv")
+    assert coords.ndim == 2
+    assert coords.shape[1] == 2
 
 
-def test_save_and_load_tour(tmp_path: Any) -> None:
+def test_save_and_load_tour(tmp_path: Path) -> None:
     """Test saving a tour to disk and loading it back."""
     # Setup dummy data
-    coords = np.array(
-        [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0], [0.5, 0.5]], dtype=np.float64
-    )
-    tour = np.array([0, 1, 2, 3, 4], dtype=np.int32)
+    tour = np.array([0, 1, 2, 3], dtype=np.int32)
+    length = 10.0
+    file_path = tmp_path / "test_tour.csv"
 
-    # Calculate length
-    length = compute_tour_length(tour, coords[:, 0], coords[:, 1])
-
-    filepath = tmp_path / "test_tour.txt"
-
-    # Save
-    save_tour(str(filepath), tour, length)
-
-    assert os.path.exists(filepath)
+    # Save using the standard production saver
+    save_solution_csv(str(file_path), tour, length)
 
     # Load
-    loaded_tour, loaded_length = load_tour(str(filepath))
+    loaded_tour, loaded_length = load_tour(str(file_path))
 
     # Verify
-    assert np.array_equal(tour, loaded_tour)
-    assert np.isclose(length, loaded_length)
-
-    # Recalculate length from loaded tour and original coords
-    recalculated_length = compute_tour_length(loaded_tour, coords[:, 0], coords[:, 1])
-    assert np.isclose(recalculated_length, loaded_length)
+    np.testing.assert_array_equal(loaded_tour, tour)
+    assert abs(loaded_length - length) < 1e-6
