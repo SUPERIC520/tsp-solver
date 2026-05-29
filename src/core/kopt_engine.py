@@ -62,6 +62,9 @@ class KOptWorkspace:
             np.empty((n, num_cand), dtype=np.float64)
         )
 
+        # Kick indices buffer
+        self.kick_indices = ensure_alignment(np.empty(4, dtype=np.int32))
+
 
 @njit(inline="always", fastmath=True)  # type: ignore
 def _dist(
@@ -712,21 +715,44 @@ def _full_cascade(
 
 @njit(fastmath=True)  # type: ignore
 def _double_bridge_kick(
-    tour: npt.NDArray[np.int32], pos: npt.NDArray[np.int32]
+    tour: npt.NDArray[np.int32], pos: npt.NDArray[np.int32], kick_indices: npt.NDArray[np.int32]
 ) -> None:
-    """Apply a double-bridge kick to escape local optima."""
+    """Apply a zero-allocation double-bridge kick to escape local optima."""
     n = tour.shape[0]
-    if n < MIN_TOUR_SIZE_KICK: return
+    if n < MIN_TOUR_SIZE_KICK:
+        return
     if n <= LOCALIZED_KICK_THRESHOLD:
-        indices = np.random.choice(n, 4, replace=False)
-        indices.sort()
-        p1, p2, p3, p4 = int(indices[0]), int(indices[1]), int(indices[2]), int(indices[3])
+        # Pick 4 unique indices
+        p1 = np.random.randint(0, n)
+        p2 = np.random.randint(0, n)
+        while p2 == p1: p2 = np.random.randint(0, n)
+        p3 = np.random.randint(0, n)
+        while p3 in (p1, p2): p3 = np.random.randint(0, n)
+        p4 = np.random.randint(0, n)
+        while p4 in (p1, p2, p3): p4 = np.random.randint(0, n)
+
+        kick_indices[0], kick_indices[1], kick_indices[2], kick_indices[3] = p1, p2, p3, p4
     else:
         W = min(LOCALIZED_KICK_W_MAX, max(LOCALIZED_KICK_W_MIN, n // LOCALIZED_KICK_W_DIVISOR))
         start = np.random.randint(0, n - W)
-        offsets = np.random.choice(W, 4, replace=False)
-        offsets.sort()
-        p1, p2, p3, p4 = int(start + offsets[0]), int(start + offsets[1]), int(start + offsets[2]), int(start + offsets[3])
+        o1 = np.random.randint(0, W)
+        o2 = np.random.randint(0, W)
+        while o2 == o1: o2 = np.random.randint(0, W)
+        o3 = np.random.randint(0, W)
+        while o3 in (o1, o2): o3 = np.random.randint(0, W)
+        o4 = np.random.randint(0, W)
+        while o4 in (o1, o2, o3): o4 = np.random.randint(0, W)
+
+        kick_indices[0], kick_indices[1], kick_indices[2], kick_indices[3] = start + o1, start + o2, start + o3, start + o4
+
+    # Sort manually to avoid allocation
+    if kick_indices[0] > kick_indices[1]: kick_indices[0], kick_indices[1] = kick_indices[1], kick_indices[0]
+    if kick_indices[2] > kick_indices[3]: kick_indices[2], kick_indices[3] = kick_indices[3], kick_indices[2]
+    if kick_indices[0] > kick_indices[2]: kick_indices[0], kick_indices[2] = kick_indices[2], kick_indices[0]
+    if kick_indices[1] > kick_indices[3]: kick_indices[1], kick_indices[3] = kick_indices[3], kick_indices[1]
+    if kick_indices[1] > kick_indices[2]: kick_indices[1], kick_indices[2] = kick_indices[2], kick_indices[1]
+
+    p1, p2, p3, p4 = int(kick_indices[0]), int(kick_indices[1]), int(kick_indices[2]), int(kick_indices[3])
 
     _reverse_segment(tour, p1 + 1, p2 + 1, pos)
     _reverse_segment(tour, p2 + 1, p3 + 1, pos)
@@ -752,6 +778,7 @@ def _cascading_kopt_inner(
     best_pos: npt.NDArray[np.int32],
     kicked_pos: npt.NDArray[np.int32],
     dlb: npt.NDArray[np.bool_],
+    kick_indices: npt.NDArray[np.int32],
 ) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.int32], float, int]:
     """ILS kick-and-optimize loop using injected workspace."""
     n = tour.shape[0]
@@ -760,7 +787,7 @@ def _cascading_kopt_inner(
     for _i in range(chunk_size):
         kicked_tour[:] = tour[:]
         kicked_pos[:] = pos[:]
-        _double_bridge_kick(kicked_tour, kicked_pos)
+        _double_bridge_kick(kicked_tour, kicked_pos, kick_indices)
         dlb.fill(False)
         _full_cascade(kicked_tour, coords_x, coords_y, candidate_set, candidate_dists, kicked_pos, dlb, max_opt=max_opt)
         length = compute_tour_length(kicked_tour, coords_x, coords_y)
@@ -850,6 +877,7 @@ def cascading_kopt_optimize(
             ws.best_pos,
             ws.kicked_pos,
             ws.dlb,
+            ws.kick_indices,
         )
         kicks_done += this_chunk
         if progress_array is not None:
