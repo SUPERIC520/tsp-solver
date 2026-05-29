@@ -137,7 +137,7 @@ def parallel_solve(
 
         while not all(completed):
             if time_limit_s > 0 and (time.time() - start_time) > time_limit_s:
-                sys.stdout.write("\r" + " " * 120 + "\r")
+                sys.stdout.write("\r" + " " * 125 + "\r")
                 if created_pool:
                     pool.terminate()
                     pool.join()
@@ -151,7 +151,7 @@ def parallel_solve(
 
                     results.append((result[0], result[1]))
                     completed[i] = True
-                    sys.stdout.write("\r" + " " * 120 + "\r")
+                    sys.stdout.write("\r" + " " * 125 + "\r")
                     print(
                         f"  - Completed seed {len(results)}/{num_seeds} "
                         f"(Length: {result[1]:.2f})"
@@ -176,7 +176,7 @@ def parallel_solve(
                     f"Iter Elapsed: {format_duration(iter_elapsed)} | "
                     f"Total Elapsed: {format_duration(total_elapsed)} ..."
                 )
-                sys.stdout.write(status.ljust(120))
+                sys.stdout.write(status.ljust(125))
                 sys.stdout.flush()
 
         if created_pool:

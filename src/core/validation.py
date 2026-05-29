@@ -20,6 +20,7 @@ def compute_hk_lower_bound(
     candidate_set: npt.NDArray[np.int32],
     max_iter: int = 500,
     initial_pi: npt.NDArray[np.float64] | None = None,
+    initial_lb: float = -np.inf,
     target_ub: float = np.inf,
     sample_name: str | None = None,
     *,
@@ -32,6 +33,7 @@ def compute_hk_lower_bound(
         candidate_set: Candidate set for neighbor pruning.
         max_iter: Maximum number of subgradient iterations.
         initial_pi: Initial pi values for subgradient optimization.
+        initial_lb: Initial best lower bound for subgradient optimization.
         target_ub: Target upper bound for step size calculation.
         sample_name: Name of the sample for caching.
         use_cache: Whether to load the cached bound if available.
@@ -53,7 +55,7 @@ def compute_hk_lower_bound(
         init_pi = np.ascontiguousarray(initial_pi, dtype=np.float64)
 
     best_lb, best_pi = _compute_hk_impl(
-        coords, candidate_set, max_iter, init_pi, target_ub
+        coords, candidate_set, max_iter, init_pi, initial_lb, target_ub
     )
 
     return best_lb, best_pi
@@ -228,6 +230,7 @@ def _compute_hk_impl(
     candidate_set: npt.NDArray[np.int32],
     max_iter: int,
     initial_pi: npt.NDArray[np.float64],
+    initial_lb: float,
     target_ub: float,
 ) -> tuple[float, npt.NDArray[np.float64]]:
     n = coords.shape[0]
@@ -235,7 +238,7 @@ def _compute_hk_impl(
     candidate_set = np.ascontiguousarray(candidate_set)
     pi = np.ascontiguousarray(initial_pi).copy()
 
-    best_lb = -np.inf
+    best_lb = initial_lb
     best_pi = pi.copy()
 
     adj_ptr, adj_indices, adj_dists = _build_undirected_adj(n, coords, candidate_set)

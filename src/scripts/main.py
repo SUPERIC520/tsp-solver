@@ -153,7 +153,7 @@ def main() -> None:
         hk_npy = cache_subdir / f"sample_{n}_hk.npy"
         pi_npy = cache_subdir / f"sample_{n}_pi.npy"
         if hk_npy.exists() and pi_npy.exists():
-            lb_val = float(np.load(hk_npy)[0])
+            lb_val = float(np.load(hk_npy).reshape(-1)[0])
             pi_orig = np.load(pi_npy)
             pi = pi_orig[new_to_orig]
             print(f"  - Loaded cached LB: {lb_val:.2f}")

@@ -160,7 +160,7 @@ def load_hk_cache(sample_name: str) -> tuple[float, np.ndarray] | None:
     pp = Path(pi_path)
     if bp.exists() and pp.exists():
         try:
-            bound = float(np.load(bound_path))
+            bound = float(np.load(bound_path).reshape(-1)[0])
             pi = np.load(pi_path)
         except (ValueError, OSError, pickle.UnpicklingError):
             return None

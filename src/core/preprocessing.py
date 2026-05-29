@@ -143,7 +143,7 @@ def _sort_by_key(
     return refined
 
 
-@njit(parallel=True, fastmath=True)  # type: ignore
+@njit(fastmath=True)  # type: ignore
 def _sort_by_alpha(
     candidate_set: npt.NDArray[np.int32],
     alpha_values: npt.NDArray[np.float64],

@@ -10,7 +10,7 @@ import time
 from src.config import DATA_PATH, KD_TREE_QUERY_SIZE
 from src.core.preprocessing import build_candidate_sets
 from src.core.validation import compute_hk_lower_bound
-from src.utils.data_io import load_cities, save_hk_cache
+from src.utils.data_io import load_cities, load_hk_cache, save_hk_cache
 
 
 def main() -> None:
@@ -21,12 +21,29 @@ def main() -> None:
     parser.add_argument(
         "--k", type=int, default=KD_TREE_QUERY_SIZE, help="Candidate set size"
     )
+    parser.add_argument(
+        "--warm", action="store_true", help="Warm start from existing cache"
+    )
     args = parser.parse_args()
 
     print(f"Loading data (n={args.n if args.n > 0 else 'Full'})...")
     coords_full = load_cities(str(DATA_PATH))
     coords = coords_full[: args.n] if args.n > 0 else coords_full
     n = coords.shape[0]
+    sample_name = str(n)
+
+    initial_pi = None
+    initial_lb = -float("inf")
+    if args.warm:
+        print(f"Attempting to load existing cache for N={sample_name}...")
+        cached = load_hk_cache(sample_name)
+        if cached:
+            lb_cached, pi_cached = cached
+            print(f"  - Warm start loaded. Previous LB: {lb_cached:.2f}")
+            initial_pi = pi_cached
+            initial_lb = lb_cached
+        else:
+            print("  - Cache not found. Starting from scratch.")
 
     print(f"Building candidate set (k={args.k})...")
     t0 = time.time()
@@ -37,7 +54,12 @@ def main() -> None:
     t0 = time.time()
     # Note: We use use_cache=False to force re-computation or extension
     lb, pi = compute_hk_lower_bound(
-        coords, candidate_set, max_iter=args.iters, use_cache=False
+        coords,
+        candidate_set,
+        max_iter=args.iters,
+        initial_pi=initial_pi,
+        initial_lb=initial_lb,
+        use_cache=False,
     )
     duration = time.time() - t0
 
